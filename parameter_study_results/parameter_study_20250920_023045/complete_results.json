@@ -1,0 +1,14 @@
+{
+  "results": {
+    "beta_0.01_lambda_0.001": {
+      "beta": 0.01,
+      "lambda_reg": 0.001,
+      "final_train_loss": 0.6861485135555268,
+      "final_eval_loss": 0.6864223957061768,
+      "final_energy_separation": 2.69035884141922,
+      "final_grad_norm": 0.02564308039505607,
+      "max_grad_norm": 0.026328507251337063,
+      "min_grad_norm": 0.008545396634643486,
+      "convergence_rate": 0.0025718013985622156,
+      "stability_score": 0.9977245271522468,
+      "gradient_explosion": 

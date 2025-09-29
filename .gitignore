@@ -1,0 +1,15 @@
+# Data folders
+data/
+ood_dpo_cache/
+weights/
+baseline_outputs/
+ablation_results/
+outputs/
+cache/
+
+# Other ignored items
+__pycache__/
+*.pyc
+feature_cache/
+unimol/
+Anaconda3-2024.02-1-Linux-x86_64.sh
