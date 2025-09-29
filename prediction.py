@@ -23,22 +23,22 @@ class EnergyDPOPredictor:
         self.model = load_pretrained_model(model_path, args).to(self.device)
         self.model.eval()
         
-        logger.info(f"模型已从 {model_path} 加载")woba
-        logger.info(f"使用设备: {self.device}")
+        logger.info(f"Model loaded from {model_path}")
+        logger.info(f"Using device: {self.device}")
         if threshold is not None:
-            logger.info(f"OOD阈值: {threshold}")
+            logger.info(f"OOD threshold: {threshold}")
     
     def predict_single(self, smiles):
-        """预测单个SMILES的OOD分数"""
+        """Predict OOD score for single SMILES"""
         return self.predict_batch([smiles])[0]
     
     def predict_batch(self, smiles_list, batch_size=64):
-        """批量预测SMILES的OOD分数"""
-        # 验证SMILES
+        """Batch predict OOD scores for SMILES"""
+        # Validate SMILES
         valid_smiles = validate_smiles(smiles_list)
         
         if len(valid_smiles) == 0:
-            logger.warning("没有找到有效的SMILES")
+            logger.warning("No valid SMILES found")
             return np.array([])
         
         all_scores = []
@@ -54,8 +54,8 @@ class EnergyDPOPredictor:
                     else:
                         all_scores.extend([scores])
                 except Exception as e:
-                    logger.warning(f"预测批次 {i//batch_size} 出错: {e}")
-                    # 为失败的预测填充中性分数
+                    logger.warning(f"Prediction batch {i//batch_size} error: {e}")
+                    # Fill neutral scores for failed predictions
                     all_scores.extend([0.0] * len(batch_smiles))
         
         return np.array(all_scores)
@@ -79,12 +79,12 @@ class EnergyDPOPredictor:
     
     def predict_from_file(self, input_file, output_file=None, smiles_column='smiles'):
         """
-        从CSV文件预测OOD分数
-        
+        Predict OOD scores from CSV file
+
         Args:
-            input_file: 输入CSV文件路径
-            output_file: 输出CSV文件路径
-            smiles_column: SMILES列名
+            input_file: Input CSV file path
+            output_file: Output CSV file path
+            smiles_column: SMILES column name
         """
         # 加载数据
         df = pd.read_csv(input_file)
@@ -157,32 +157,32 @@ def main():
             args.smiles_column
         )
         
-        # 打印摘要
-        print("\n预测摘要:")
-        print(f"总分子数: {len(results_df)}")
-        print(f"平均能量分数: {results_df['energy_score'].mean():.4f}")
-        print(f"能量分数标准差: {results_df['energy_score'].std():.4f}")
+        # Print summary
+        print("\nPrediction Summary:")
+        print(f"Total molecules: {len(results_df)}")
+        print(f"Average energy score: {results_df['energy_score'].mean():.4f}")
+        print(f"Energy score std dev: {results_df['energy_score'].std():.4f}")
         
         if args.threshold is not None:
             ood_count = results_df['ood_prediction'].sum()
-            print(f"OOD分子: {ood_count} ({ood_count/len(results_df)*100:.1f}%)")
+            print(f"OOD molecules: {ood_count} ({ood_count/len(results_df)*100:.1f}%)")
     
     elif args.smiles:
-        # 预测个别SMILES
+        # Predict individual SMILES
         scores = predictor.predict_batch(args.smiles)
         
-        print("\n预测结果:")
+        print("\nPrediction Results:")
         print("-" * 80)
         for smiles, score in zip(args.smiles, scores):
             if args.threshold is not None:
                 prediction = "OOD" if score > args.threshold else "ID"
-                print(f"SMILES: {smiles:<40} 分数: {score:6.4f} 预测: {prediction}")
+                print(f"SMILES: {smiles:<40} Score: {score:6.4f} Prediction: {prediction}")
             else:
-                print(f"SMILES: {smiles:<40} 分数: {score:6.4f}")
+                print(f"SMILES: {smiles:<40} Score: {score:6.4f}")
         print("-" * 80)
     
     else:
-        print("请提供 --input_file 或 --smiles 参数")
+        print("Please provide --input_file or --smiles arguments")
 
 if __name__ == "__main__":
     main()

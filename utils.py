@@ -149,8 +149,8 @@ def smiles2graph(smiles):
         }
 
 def create_atom_token_mapping():
-    """创建原子符号到 token ID 的映射"""
-    # 基于 Uni-Mol 的原子词汇表
+    """Create mapping from atom symbols to token IDs"""
+    # Based on Uni-Mol atom vocabulary
     atom_vocab = [
         '[PAD]', '[UNK]', '[CLS]', '[SEP]', '[MASK]',
         'H', 'He', 'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
@@ -171,8 +171,8 @@ def create_atom_token_mapping():
 
 def unimol_collate_fn(samples, atom_token_mapping=None):
     """
-    Uni-Mol 的批处理整理函数
-    将多个分子图数据整理成模型输入格式
+    Uni-Mol batch collate function
+    Organize multiple molecular graph data into model input format
     """
     if atom_token_mapping is None:
         atom_token_mapping = create_atom_token_mapping()
@@ -181,11 +181,11 @@ def unimol_collate_fn(samples, atom_token_mapping=None):
     if batch_size == 0:
         return {}
     
-    # 找到最大原子数
+    # Find maximum number of atoms
     max_atoms = max(len(sample['atoms']) for sample in samples)
-    max_atoms = max(max_atoms, 1)  # 至少为 1
+    max_atoms = max(max_atoms, 1)  # At least 1
     
-    # 初始化批处理张量
+    # Initialize batch tensors
     batch_tokens = torch.zeros(batch_size, max_atoms + 2, dtype=torch.long)  # +2 for CLS and SEP
     batch_coordinates = torch.zeros(batch_size, max_atoms + 2, 3, dtype=torch.float32)
     batch_distance = torch.zeros(batch_size, max_atoms + 2, max_atoms + 2, dtype=torch.float32)
@@ -199,26 +199,26 @@ def unimol_collate_fn(samples, atom_token_mapping=None):
         
         num_atoms = len(atoms)
         
-        # 设置 tokens (CLS + atoms + SEP)
+        # Set tokens (CLS + atoms + SEP)
         batch_tokens[i, 0] = atom_token_mapping.get('[CLS]', 2)  # CLS token
         for j, atom in enumerate(atoms):
             batch_tokens[i, j + 1] = atom_token_mapping.get(atom, atom_token_mapping.get('[UNK]', 1))
         if num_atoms + 1 < max_atoms + 2:
             batch_tokens[i, num_atoms + 1] = atom_token_mapping.get('[SEP]', 3)  # SEP token
         
-        # 设置坐标 (CLS 坐标为原点，SEP 坐标也为原点)
+        # Set coordinates (CLS coordinates as origin, SEP coordinates also as origin)
         batch_coordinates[i, 0] = torch.zeros(3)  # CLS coordinates
         batch_coordinates[i, 1:num_atoms + 1] = torch.from_numpy(coordinates)
         if num_atoms + 1 < max_atoms + 2:
             batch_coordinates[i, num_atoms + 1] = torch.zeros(3)  # SEP coordinates
         
-        # 设置距离矩阵
+        # Set distance matrix
         batch_distance[i, 1:num_atoms + 1, 1:num_atoms + 1] = torch.from_numpy(distance_matrix)
         
-        # 设置边类型
+        # Set edge types
         batch_edge_type[i, 1:num_atoms + 1, 1:num_atoms + 1] = torch.from_numpy(edge_types)
     
-    # 创建 padding mask
+    # Create padding mask
     padding_mask = (batch_tokens == atom_token_mapping.get('[PAD]', 0))
     
     return {
@@ -242,7 +242,7 @@ def unimol_collate_fn(samples, atom_token_mapping=None):
 # =============================================================================
 
 def get_dataset_name_from_file(file_path):
-    """从文件路径中提取数据集名称"""
+    """Extract dataset name from file path"""
     if not file_path:
         return "unknown"
     
@@ -256,7 +256,7 @@ def get_dataset_name_from_file(file_path):
     elif "good_zinc" in filename.lower():
         return "good_zinc"
     
-    # DrugOOD datasets (保持向后兼容)
+    # DrugOOD datasets (maintain backward compatibility)
     if "lbap" in filename.lower():
         parts = filename.replace('.json', '').split('_')
         return '_'.join(parts[:4]) if len(parts) >= 4 else filename.replace('.json', '')
@@ -264,63 +264,63 @@ def get_dataset_name_from_file(file_path):
     return filename.replace('.json', '').replace('.pt', '')
 
 def validate_smiles(smiles_list):
-    """验证和清理SMILES列表 - 宽松版本"""
+    """Validate and clean SMILES list - lenient version"""
     valid_smiles = []
     invalid_count = 0
     
     for smiles in smiles_list:
-        # 基本检查：非空字符串
+        # Basic check: non-empty string
         if smiles and isinstance(smiles, str) and len(smiles.strip()) > 0:
             smiles_clean = smiles.strip()
             
             try:
-                # 尝试RDKit解析，但不强制标准化
+                # Try RDKit parsing, but don't force standardization
                 mol = Chem.MolFromSmiles(smiles_clean)
                 if mol is not None:
-                    # 使用原始SMILES，避免标准化导致的数据丢失
+                    # Use original SMILES, avoid data loss from standardization
                     valid_smiles.append(smiles_clean)
                 else:
-                    # RDKit无法解析，但可能仍然是有效的化学结构
-                    # 进行基本的字符检查
+                    # RDKit cannot parse, but might still be valid chemical structure
+                    # Perform basic character check
                     if _basic_smiles_check(smiles_clean):
                         valid_smiles.append(smiles_clean)
-                        logger.debug(f"使用基本检查通过的SMILES: {smiles_clean}")
+                        logger.debug(f"Using SMILES that passed basic check: {smiles_clean}")
                     else:
                         invalid_count += 1
             except Exception as e:
-                # RDKit解析出错，尝试基本检查
+                # RDKit parsing error, try basic check
                 if _basic_smiles_check(smiles_clean):
                     valid_smiles.append(smiles_clean)
-                    logger.debug(f"RDKit解析失败但基本检查通过: {smiles_clean}")
+                    logger.debug(f"RDKit parsing failed but basic check passed: {smiles_clean}")
                 else:
                     invalid_count += 1
-                    logger.debug(f"SMILES验证失败: {smiles_clean}, 错误: {e}")
+                    logger.debug(f"SMILES validation failed: {smiles_clean}, error: {e}")
         else:
             invalid_count += 1
     
     if invalid_count > 0:
-        logger.warning(f"过滤掉 {invalid_count} 个无效SMILES")
+        logger.warning(f"Filtered out {invalid_count} invalid SMILES")
     
     return valid_smiles
 
 def _basic_smiles_check(smiles):
-    """基本的SMILES格式检查"""
+    """Basic SMILES format check"""
     if not smiles or len(smiles) < 1:
         return False
     
-    # 基本的SMILES字符集检查
+    # Basic SMILES character set check
     valid_chars = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789()[]{}=#@+-.\\/|')
     smiles_chars = set(smiles)
     
-    # 如果包含太多非SMILES字符，则认为无效
+    # If contains too many non-SMILES characters, consider invalid
     invalid_chars = smiles_chars - valid_chars
     if len(invalid_chars) > 0:
-        # 允许少量特殊字符（可能是扩展的SMILES语法）
+        # Allow small amount of special characters (might be extended SMILES syntax)
         if len(invalid_chars) <= 2:
             return True
         return False
     
-    # 基本的括号匹配检查
+    # Basic bracket matching check
     paren_count = smiles.count('(') - smiles.count(')')
     bracket_count = smiles.count('[') - smiles.count(']')
     
@@ -381,137 +381,41 @@ def process_drugood_data(data_file, max_samples=None):
             iid_val_raw = random.sample(iid_val_raw, max_samples)
         val_raw = iid_val_raw
     else:
-        # 如果没有iid_val，从train中分出验证数据
+        # If no iid_val, split validation data from training
         if len(train_raw) >= 100:
             val_size = min(len(train_raw) // 4, 1000)
             val_raw = random.sample(train_raw, val_size)
-            # 从train_raw中移除已选的验证数据
+            # Remove selected validation data from train_raw
             val_smiles_set = set(item.get('smiles', '') for item in val_raw)
             train_raw = [item for item in train_raw if item.get('smiles', '') not in val_smiles_set]
         else:
-            # 数据不够分，随机分割
+            # Not enough data to split, random split
             train_copy = train_raw.copy()
             random.shuffle(train_copy)
             split_point = len(train_copy) // 2
             val_raw = train_copy[:split_point]
             train_raw = train_copy[split_point:]
     
-    # 提取SMILES
+    # Extract SMILES
     train_id_smiles = [item.get('smiles') for item in train_raw if item.get('smiles')]
     val_id_smiles = [item.get('smiles') for item in val_raw if item.get('smiles')]
     train_ood_smiles = [item.get('smiles') for item in ood_val_raw if item.get('smiles')]
     test_id_smiles = [item.get('smiles') for item in iid_test_raw if item.get('smiles')]
     test_ood_smiles = [item.get('smiles') for item in ood_test_raw if item.get('smiles')]
     
-    # 验证SMILES
+    # Validate SMILES
     train_id_smiles = validate_smiles(train_id_smiles)
     val_id_smiles = validate_smiles(val_id_smiles)
     train_ood_smiles = validate_smiles(train_ood_smiles)
     test_id_smiles = validate_smiles(test_id_smiles)
     test_ood_smiles = validate_smiles(test_ood_smiles)
     
-    logger.info(f"✅ OOD Detection数据处理完成:")
-    logger.info(f"  训练ID: {len(train_id_smiles)}")
-    logger.info(f"  验证ID: {len(val_id_smiles)}")
-    logger.info(f"  训练OOD: {len(train_ood_smiles)}")
-    logger.info(f"  测试ID: {len(test_id_smiles)}")
-    logger.info(f"  测试OOD: {len(test_ood_smiles)}")
-    
-    return {
-        'train_id_smiles': train_id_smiles,
-        'val_id_smiles': val_id_smiles,
-        'train_ood_smiles': train_ood_smiles,
-        'test_id_smiles': test_id_smiles,
-        'test_ood_smiles': test_ood_smiles
-    }
-
-def process_drugood_data(data_file, max_samples=None):
-    """
-    处理DrugOOD数据集为OOD Detection格式
-    
-    Args:
-        data_file: 数据文件路径
-        max_samples: 最大样本数限制
-    
-    Returns:
-        dict: 包含训练和验证数据的字典
-    """
-    logger.info(f"🎯 OOD Detection模式加载: {data_file}")
-    
-    with open(data_file, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    if not isinstance(data, dict) or 'split' not in data:
-        raise ValueError(f"不是有效的DrugOOD格式：缺少'split'键")
-    
-    split_data = data['split']
-    
-    # 按照OOD Detection的正确理念使用DrugOOD数据
-    train_raw = split_data.get('train', [])           # ID训练数据
-    ood_val_raw = split_data.get('ood_val', [])       # OOD训练数据（用于DPO负例）
-    ood_test_raw = split_data.get('ood_test', [])     # OOD测试数据（最终测试用）
-    iid_val_raw = split_data.get('iid_val', [])       # ID验证数据
-    iid_test_raw = split_data.get('iid_test', [])     # ID测试数据（最终测试用）
-    
-    logger.info(f"📊 OOD Detection原始数据:")
-    logger.info(f"  ID训练(train): {len(train_raw)}")
-    logger.info(f"  ID验证(iid_val): {len(iid_val_raw)}")
-    logger.info(f"  ID测试(iid_test): {len(iid_test_raw)}")
-    logger.info(f"  OOD训练(ood_val): {len(ood_val_raw)}")
-    logger.info(f"  OOD测试(ood_test): {len(ood_test_raw)}")
-    
-    # 如果指定了最大样本数，进行采样
-    if max_samples:
-        if len(train_raw) > max_samples:
-            train_raw = random.sample(train_raw, max_samples)
-        if len(ood_val_raw) > max_samples:
-            ood_val_raw = random.sample(ood_val_raw, max_samples)
-        if len(iid_test_raw) > max_samples:
-            iid_test_raw = random.sample(iid_test_raw, max_samples)
-        if len(ood_test_raw) > max_samples:
-            ood_test_raw = random.sample(ood_test_raw, max_samples)
-    
-    # 处理验证数据
-    if iid_val_raw:
-        if max_samples and len(iid_val_raw) > max_samples:
-            iid_val_raw = random.sample(iid_val_raw, max_samples)
-        val_raw = iid_val_raw
-    else:
-        # 如果没有iid_val，从train中分出验证数据
-        if len(train_raw) >= 100:
-            val_size = min(len(train_raw) // 4, 1000)
-            val_raw = random.sample(train_raw, val_size)
-            # 从train_raw中移除已选的验证数据
-            val_smiles_set = set(item.get('smiles', '') for item in val_raw)
-            train_raw = [item for item in train_raw if item.get('smiles', '') not in val_smiles_set]
-        else:
-            # 数据不够分，随机分割
-            train_copy = train_raw.copy()
-            random.shuffle(train_copy)
-            split_point = len(train_copy) // 2
-            val_raw = train_copy[:split_point]
-            train_raw = train_copy[split_point:]
-    
-    # 提取SMILES
-    train_id_smiles = [item.get('smiles') for item in train_raw if item.get('smiles')]
-    val_id_smiles = [item.get('smiles') for item in val_raw if item.get('smiles')]
-    train_ood_smiles = [item.get('smiles') for item in ood_val_raw if item.get('smiles')]
-    test_id_smiles = [item.get('smiles') for item in iid_test_raw if item.get('smiles')]
-    test_ood_smiles = [item.get('smiles') for item in ood_test_raw if item.get('smiles')]
-    
-    # 验证SMILES
-    train_id_smiles = validate_smiles(train_id_smiles)
-    val_id_smiles = validate_smiles(val_id_smiles)
-    train_ood_smiles = validate_smiles(train_ood_smiles)
-    test_id_smiles = validate_smiles(test_id_smiles)
-    test_ood_smiles = validate_smiles(test_ood_smiles)
-    
-    logger.info(f"✅ OOD Detection数据处理完成:")
-    logger.info(f"  训练ID: {len(train_id_smiles)}")
-    logger.info(f"  验证ID: {len(val_id_smiles)}")
-    logger.info(f"  训练OOD: {len(train_ood_smiles)}")
-    logger.info(f"  测试ID: {len(test_id_smiles)}")
-    logger.info(f"  测试OOD: {len(test_ood_smiles)}")
+    logger.info(f"✅ OOD Detection data processing completed:")
+    logger.info(f"  Training ID: {len(train_id_smiles)}")
+    logger.info(f"  Validation ID: {len(val_id_smiles)}")
+    logger.info(f"  Training OOD: {len(train_ood_smiles)}")
+    logger.info(f"  Test ID: {len(test_id_smiles)}")
+    logger.info(f"  Test OOD: {len(test_ood_smiles)}")
     
     return {
         'train_id_smiles': train_id_smiles,
@@ -706,11 +610,11 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
 
         logger.info(f"✅ {dataset_name} 数据加载完成:")
         logger.info(f"  训练ID: {len(train_smiles)}")
-        logger.info(f"  验证ID: {len(val_id_smiles)}")
-        logger.info(f"  训练OOD: {len(train_ood_smiles)}")
+        logger.info(f"  Validation ID: {len(val_id_smiles)}")
+        logger.info(f"  Training OOD: {len(train_ood_smiles)}")
         logger.info(f"  验证OOD: {len(val_ood_smiles)}")
-        logger.info(f"  测试ID: {len(test_id_smiles)}")
-        logger.info(f"  测试OOD: {len(test_ood_smiles)}")
+        logger.info(f"  Test ID: {len(test_id_smiles)}")
+        logger.info(f"  Test OOD: {len(test_ood_smiles)}")
 
         return {
             'train_id_smiles': train_smiles,

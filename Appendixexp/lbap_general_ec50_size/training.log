@@ -1,0 +1,235 @@
+2025-09-25 01:10:28,938 - __main__ - INFO - Logging to: ./Appendixexp/lbap_general_ec50_size/training.log
+2025-09-25 01:10:28,939 - __main__ - INFO - Random seed set to: 42
+2025-09-25 01:10:28,939 - __main__ - INFO - Data seed set to: 42
+2025-09-25 01:10:28,939 - __main__ - INFO - Run mode: train
+2025-09-25 01:10:28,939 - __main__ - INFO - Foundation model: minimol
+2025-09-25 01:10:28,939 - __main__ - INFO - Dataset: lbap_general_ec50_size (type: None)
+2025-09-25 01:10:28,939 - __main__ - INFO - GOOD Domain: scaffold, Shift: covariate
+2025-09-25 01:10:28,939 - __main__ - INFO - Output directory: ./Appendixexp/lbap_general_ec50_size
+2025-09-25 01:10:28,939 - __main__ - INFO - Device: cuda
+2025-09-25 01:10:28,939 - __main__ - INFO - Argument validation passed
+2025-09-25 01:10:29,514 - __main__ - INFO - All required modules loaded
+2025-09-25 01:10:29,514 - __main__ - INFO - Starting training (Foundation Model: minimol)
+2025-09-25 01:10:29,514 - model - INFO - Initializing EnergyDPOModel (using minimol)
+2025-09-25 01:10:31,676 - model - INFO - Loading Minimol model...
+2025-09-25 01:10:32,146 - model - INFO - Minimol model loaded successfully
+2025-09-25 01:10:32,301 - train - INFO - 🚀 开始全新训练
+2025-09-25 01:10:32,302 - train - INFO - Trainer initialization complete
+2025-09-25 01:10:32,302 - train - INFO - Starting epoch: 1
+2025-09-25 01:10:32,302 - train - INFO - Device: cuda
+2025-09-25 01:10:32,302 - train - INFO - 开始训练...
+2025-09-25 01:10:32,302 - train - INFO - 设备: cuda
+2025-09-25 01:10:32,302 - train - INFO - 输出目录: ./Appendixexp/lbap_general_ec50_size
+2025-09-25 01:10:32,302 - train - INFO - 起始epoch: 1
+2025-09-25 01:10:32,302 - train - INFO - 总epochs: 20
+2025-09-25 01:10:32,302 - data_loader - INFO - === Starting OOD Data Preparation ===
+2025-09-25 01:10:32,302 - data_loader - INFO - Dataset: lbap_general_ec50_size | Foundation Model: minimol | Data Seed: 42
+2025-09-25 01:10:32,316 - data_loader - INFO - Cache parameter mismatch: dataset_name = drugood != lbap_general_ec50_size
+2025-09-25 01:10:32,317 - utils - INFO - 🎯 OOD Detection模式加载: ./data/raw/lbap_general_ec50_size.json
+2025-09-25 01:10:32,467 - utils - INFO - 📊 OOD Detection原始数据:
+2025-09-25 01:10:32,467 - utils - INFO -   ID训练(train): 41766
+2025-09-25 01:10:32,467 - utils - INFO -   ID验证(iid_val): 13834
+2025-09-25 01:10:32,467 - utils - INFO -   ID测试(iid_test): 14257
+2025-09-25 01:10:32,467 - utils - INFO -   OOD训练(ood_val): 25952
+2025-09-25 01:10:32,467 - utils - INFO -   OOD测试(ood_test): 20312
+2025-09-25 01:10:52,598 - utils - INFO - ✅ OOD Detection数据处理完成:
+2025-09-25 01:10:52,598 - utils - INFO -   训练ID: 41766
+2025-09-25 01:10:52,598 - utils - INFO -   验证ID: 13834
+2025-09-25 01:10:52,598 - utils - INFO -   训练OOD: 25952
+2025-09-25 01:10:52,598 - utils - INFO -   测试ID: 14257
+2025-09-25 01:10:52,598 - utils - INFO -   测试OOD: 20312
+2025-09-25 01:10:52,604 - data_loader - WARNING - Validation OOD not found. Splitting from training OOD set.
+2025-09-25 01:10:52,612 - data_loader - INFO - Raw data loaded. Found 41766 train_id, 22952 train_ood, 13834 val_id, 3000 val_ood smiles.
+2025-09-25 01:10:52,616 - data_loader - INFO - Cache parameter mismatch: dataset_name = drugood != lbap_general_ec50_size
+2025-09-25 01:10:52,616 - data_loader - INFO - Cache miss - performing data sampling...
+2025-09-25 01:10:52,616 - data_loader - INFO - Target dataset sizes: {'train_id': 2000, 'train_ood': 2000, 'val_id': 600, 'val_ood': 600, 'test_id': 1000, 'test_ood': 1000}
+2025-09-25 01:10:52,758 - data_loader - INFO - ✅ No cross-split overlap detected - data splits are clean.
+2025-09-25 01:10:52,763 - data_loader - INFO - Splits cache saved: /home/ubuntu/projects/ood_dpo_cache/lbap_general_ec50_size_seed42_splits.json (518.6 KB, 7200 molecules)
+2025-09-25 01:10:52,763 - data_loader - INFO - Saved data splits to cache for future runs
+2025-09-25 01:10:53,658 - data_loader - INFO - Cache check: cached='minimol' vs current='minimol'
+2025-09-25 01:10:53,947 - data_loader - INFO - Loaded 111588 features from cache: /home/ubuntu/projects/ood_dpo_cache/lbap_general_ec50_size_minimol_features.pkl
+2025-09-25 01:10:53,950 - data_loader - INFO - All required features were found in the cache.
+2025-09-25 01:10:53,952 - data_loader - INFO - ==================================================
+2025-09-25 01:10:53,952 - data_loader - INFO - Final Dataset Summary:
+2025-09-25 01:10:53,952 - data_loader - INFO -   - train_id  :  2000 samples
+2025-09-25 01:10:53,952 - data_loader - INFO -   - train_ood :  2000 samples
+2025-09-25 01:10:53,952 - data_loader - INFO -   - val_id    :   600 samples
+2025-09-25 01:10:53,952 - data_loader - INFO -   - val_ood   :   600 samples
+2025-09-25 01:10:53,952 - data_loader - INFO -   - test_id   :  1000 samples
+2025-09-25 01:10:53,952 - data_loader - INFO -   - test_ood  :  1000 samples
+2025-09-25 01:10:53,952 - data_loader - INFO - ==================================================
+2025-09-25 01:10:53,952 - data_loader - INFO - Data preparation complete.
+2025-09-25 01:10:53,952 - data_loader - INFO - Creating DataLoaders with pre-computed features.
+2025-09-25 01:10:53,958 - data_loader - INFO - Precomputed Dataset (train): ID=2000, OOD=2000, effective length=2000
+2025-09-25 01:10:53,960 - data_loader - INFO - Precomputed Dataset (eval): ID=600, OOD=600, effective length=600
+2025-09-25 01:10:54,848 - train - INFO - Training dynamics saved: epoch 1, misranked: 0.3628, boundary: 0.3899, margin: 0.0344
+2025-09-25 01:10:54,848 - train - INFO - Epoch 1 完成:
+2025-09-25 01:10:54,848 - train - INFO -   训练损失: 0.6916
+2025-09-25 01:10:54,848 - train - INFO -   验证损失: 0.6897
+2025-09-25 01:10:54,848 - train - INFO -   能量分离: 0.0750
+2025-09-25 01:10:54,848 - train - INFO -   Val-AUROC: 0.8317 (AUPR: 0.8026, FPR95: 0.5150)
+2025-09-25 01:10:54,853 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:54,857 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_000.pth
+2025-09-25 01:10:54,857 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.8317
+2025-09-25 01:10:54,861 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_000.pth
+2025-09-25 01:10:54,913 - train - INFO - Training dynamics saved: epoch 2, misranked: 0.2168, boundary: 0.2563, margin: 0.0936
+2025-09-25 01:10:54,913 - train - INFO - Epoch 2 完成:
+2025-09-25 01:10:54,913 - train - INFO -   训练损失: 0.6891
+2025-09-25 01:10:54,913 - train - INFO -   验证损失: 0.6871
+2025-09-25 01:10:54,914 - train - INFO -   能量分离: 0.1371
+2025-09-25 01:10:54,914 - train - INFO -   Val-AUROC: 0.8987 (AUPR: 0.8814, FPR95: 0.3350)
+2025-09-25 01:10:54,917 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:54,917 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.8987
+2025-09-25 01:10:54,966 - train - INFO - Training dynamics saved: epoch 3, misranked: 0.1485, boundary: 0.1692, margin: 0.1579
+2025-09-25 01:10:54,966 - train - INFO - Epoch 3 完成:
+2025-09-25 01:10:54,966 - train - INFO -   训练损失: 0.6862
+2025-09-25 01:10:54,966 - train - INFO -   验证损失: 0.6843
+2025-09-25 01:10:54,966 - train - INFO -   能量分离: 0.1963
+2025-09-25 01:10:54,966 - train - INFO -   Val-AUROC: 0.9220 (AUPR: 0.9062, FPR95: 0.2683)
+2025-09-25 01:10:54,970 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:54,970 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9220
+2025-09-25 01:10:55,013 - train - INFO - Training dynamics saved: epoch 4, misranked: 0.1159, boundary: 0.1186, margin: 0.2182
+2025-09-25 01:10:55,013 - train - INFO - Epoch 4 完成:
+2025-09-25 01:10:55,013 - train - INFO -   训练损失: 0.6834
+2025-09-25 01:10:55,013 - train - INFO -   验证损失: 0.6812
+2025-09-25 01:10:55,013 - train - INFO -   能量分离: 0.2624
+2025-09-25 01:10:55,013 - train - INFO -   Val-AUROC: 0.9325 (AUPR: 0.9192, FPR95: 0.2600)
+2025-09-25 01:10:55,017 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,017 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9325
+2025-09-25 01:10:55,059 - train - INFO - Training dynamics saved: epoch 5, misranked: 0.0994, boundary: 0.0889, margin: 0.2891
+2025-09-25 01:10:55,059 - train - INFO - Epoch 5 完成:
+2025-09-25 01:10:55,059 - train - INFO -   训练损失: 0.6801
+2025-09-25 01:10:55,059 - train - INFO -   验证损失: 0.6777
+2025-09-25 01:10:55,059 - train - INFO -   能量分离: 0.3418
+2025-09-25 01:10:55,059 - train - INFO -   Val-AUROC: 0.9364 (AUPR: 0.9247, FPR95: 0.2550)
+2025-09-25 01:10:55,063 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,063 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9364
+2025-09-25 01:10:55,106 - train - INFO - Training dynamics saved: epoch 6, misranked: 0.0831, boundary: 0.0644, margin: 0.3851
+2025-09-25 01:10:55,106 - train - INFO - Epoch 6 完成:
+2025-09-25 01:10:55,106 - train - INFO -   训练损失: 0.6761
+2025-09-25 01:10:55,106 - train - INFO -   验证损失: 0.6739
+2025-09-25 01:10:55,106 - train - INFO -   能量分离: 0.4386
+2025-09-25 01:10:55,106 - train - INFO -   Val-AUROC: 0.9384 (AUPR: 0.9280, FPR95: 0.2583)
+2025-09-25 01:10:55,110 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,113 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_005.pth
+2025-09-25 01:10:55,113 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9384
+2025-09-25 01:10:55,117 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_005.pth
+2025-09-25 01:10:55,162 - train - INFO - Training dynamics saved: epoch 7, misranked: 0.0710, boundary: 0.0455, margin: 0.4992
+2025-09-25 01:10:55,162 - train - INFO - Epoch 7 完成:
+2025-09-25 01:10:55,163 - train - INFO -   训练损失: 0.6717
+2025-09-25 01:10:55,163 - train - INFO -   验证损失: 0.6696
+2025-09-25 01:10:55,163 - train - INFO -   能量分离: 0.5521
+2025-09-25 01:10:55,163 - train - INFO -   Val-AUROC: 0.9387 (AUPR: 0.9286, FPR95: 0.2633)
+2025-09-25 01:10:55,166 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,166 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9387
+2025-09-25 01:10:55,208 - train - INFO - Training dynamics saved: epoch 8, misranked: 0.0759, boundary: 0.0398, margin: 0.5998
+2025-09-25 01:10:55,208 - train - INFO - Epoch 8 完成:
+2025-09-25 01:10:55,208 - train - INFO -   训练损失: 0.6680
+2025-09-25 01:10:55,208 - train - INFO -   验证损失: 0.6649
+2025-09-25 01:10:55,208 - train - INFO -   能量分离: 0.6803
+2025-09-25 01:10:55,208 - train - INFO -   Val-AUROC: 0.9378 (AUPR: 0.9282, FPR95: 0.2650)
+2025-09-25 01:10:55,249 - train - INFO - Training dynamics saved: epoch 9, misranked: 0.0689, boundary: 0.0314, margin: 0.7413
+2025-09-25 01:10:55,249 - train - INFO - Epoch 9 完成:
+2025-09-25 01:10:55,249 - train - INFO -   训练损失: 0.6631
+2025-09-25 01:10:55,249 - train - INFO -   验证损失: 0.6599
+2025-09-25 01:10:55,249 - train - INFO -   能量分离: 0.8310
+2025-09-25 01:10:55,249 - train - INFO -   Val-AUROC: 0.9376 (AUPR: 0.9282, FPR95: 0.2650)
+2025-09-25 01:10:55,294 - train - INFO - Training dynamics saved: epoch 10, misranked: 0.0756, boundary: 0.0278, margin: 0.8686
+2025-09-25 01:10:55,294 - train - INFO - Epoch 10 完成:
+2025-09-25 01:10:55,294 - train - INFO -   训练损失: 0.6593
+2025-09-25 01:10:55,294 - train - INFO -   验证损失: 0.6549
+2025-09-25 01:10:55,294 - train - INFO -   能量分离: 1.0069
+2025-09-25 01:10:55,294 - train - INFO -   Val-AUROC: 0.9395 (AUPR: 0.9303, FPR95: 0.2500)
+2025-09-25 01:10:55,298 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,298 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9395
+2025-09-25 01:10:55,342 - train - INFO - Training dynamics saved: epoch 11, misranked: 0.0698, boundary: 0.0217, margin: 1.0503
+2025-09-25 01:10:55,342 - train - INFO - Epoch 11 完成:
+2025-09-25 01:10:55,342 - train - INFO -   训练损失: 0.6542
+2025-09-25 01:10:55,342 - train - INFO -   验证损失: 0.6507
+2025-09-25 01:10:55,342 - train - INFO -   能量分离: 1.1781
+2025-09-25 01:10:55,342 - train - INFO -   Val-AUROC: 0.9414 (AUPR: 0.9325, FPR95: 0.2450)
+2025-09-25 01:10:55,346 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,349 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_010.pth
+2025-09-25 01:10:55,349 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9414
+2025-09-25 01:10:55,353 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_010.pth
+2025-09-25 01:10:55,404 - train - INFO - Training dynamics saved: epoch 12, misranked: 0.0628, boundary: 0.0178, margin: 1.2440
+2025-09-25 01:10:55,404 - train - INFO - Epoch 12 完成:
+2025-09-25 01:10:55,404 - train - INFO -   训练损失: 0.6496
+2025-09-25 01:10:55,404 - train - INFO -   验证损失: 0.6467
+2025-09-25 01:10:55,404 - train - INFO -   能量分离: 1.3551
+2025-09-25 01:10:55,404 - train - INFO -   Val-AUROC: 0.9428 (AUPR: 0.9340, FPR95: 0.2400)
+2025-09-25 01:10:55,407 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,407 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9428
+2025-09-25 01:10:55,451 - train - INFO - Training dynamics saved: epoch 13, misranked: 0.0591, boundary: 0.0149, margin: 1.4134
+2025-09-25 01:10:55,451 - train - INFO - Epoch 13 完成:
+2025-09-25 01:10:55,451 - train - INFO -   训练损失: 0.6458
+2025-09-25 01:10:55,451 - train - INFO -   验证损失: 0.6433
+2025-09-25 01:10:55,451 - train - INFO -   能量分离: 1.5490
+2025-09-25 01:10:55,451 - train - INFO -   Val-AUROC: 0.9455 (AUPR: 0.9372, FPR95: 0.2350)
+2025-09-25 01:10:55,455 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,455 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9455
+2025-09-25 01:10:55,500 - train - INFO - Training dynamics saved: epoch 14, misranked: 0.0535, boundary: 0.0128, margin: 1.6077
+2025-09-25 01:10:55,500 - train - INFO - Epoch 14 完成:
+2025-09-25 01:10:55,500 - train - INFO -   训练损失: 0.6420
+2025-09-25 01:10:55,500 - train - INFO -   验证损失: 0.6404
+2025-09-25 01:10:55,500 - train - INFO -   能量分离: 1.7261
+2025-09-25 01:10:55,500 - train - INFO -   Val-AUROC: 0.9473 (AUPR: 0.9388, FPR95: 0.2283)
+2025-09-25 01:10:55,503 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,504 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9473
+2025-09-25 01:10:55,547 - train - INFO - Training dynamics saved: epoch 15, misranked: 0.0573, boundary: 0.0119, margin: 1.7820
+2025-09-25 01:10:55,547 - train - INFO - Epoch 15 完成:
+2025-09-25 01:10:55,547 - train - INFO -   训练损失: 0.6401
+2025-09-25 01:10:55,547 - train - INFO -   验证损失: 0.6381
+2025-09-25 01:10:55,547 - train - INFO -   能量分离: 1.9045
+2025-09-25 01:10:55,547 - train - INFO -   Val-AUROC: 0.9505 (AUPR: 0.9424, FPR95: 0.2183)
+2025-09-25 01:10:55,551 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,551 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9505
+2025-09-25 01:10:55,594 - train - INFO - Training dynamics saved: epoch 16, misranked: 0.0458, boundary: 0.0098, margin: 1.9992
+2025-09-25 01:10:55,594 - train - INFO - Epoch 16 完成:
+2025-09-25 01:10:55,594 - train - INFO -   训练损失: 0.6369
+2025-09-25 01:10:55,594 - train - INFO -   验证损失: 0.6365
+2025-09-25 01:10:55,594 - train - INFO -   能量分离: 2.0481
+2025-09-25 01:10:55,594 - train - INFO -   Val-AUROC: 0.9531 (AUPR: 0.9448, FPR95: 0.2200)
+2025-09-25 01:10:55,598 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,601 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_015.pth
+2025-09-25 01:10:55,602 - train - INFO - 清理旧文件: checkpoint_epoch_000.pth
+2025-09-25 01:10:55,602 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9531
+2025-09-25 01:10:55,605 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_015.pth
+2025-09-25 01:10:55,647 - train - INFO - Training dynamics saved: epoch 17, misranked: 0.0458, boundary: 0.0083, margin: 2.1611
+2025-09-25 01:10:55,647 - train - INFO - Epoch 17 完成:
+2025-09-25 01:10:55,647 - train - INFO -   训练损失: 0.6347
+2025-09-25 01:10:55,647 - train - INFO -   验证损失: 0.6347
+2025-09-25 01:10:55,647 - train - INFO -   能量分离: 2.1742
+2025-09-25 01:10:55,647 - train - INFO -   Val-AUROC: 0.9564 (AUPR: 0.9483, FPR95: 0.2050)
+2025-09-25 01:10:55,651 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,651 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9564
+2025-09-25 01:10:55,694 - train - INFO - Training dynamics saved: epoch 18, misranked: 0.0425, boundary: 0.0080, margin: 2.2770
+2025-09-25 01:10:55,694 - train - INFO - Epoch 18 完成:
+2025-09-25 01:10:55,695 - train - INFO -   训练损失: 0.6342
+2025-09-25 01:10:55,695 - train - INFO -   验证损失: 0.6336
+2025-09-25 01:10:55,695 - train - INFO -   能量分离: 2.2479
+2025-09-25 01:10:55,695 - train - INFO -   Val-AUROC: 0.9588 (AUPR: 0.9504, FPR95: 0.1850)
+2025-09-25 01:10:55,698 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,698 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9588
+2025-09-25 01:10:55,740 - train - INFO - Training dynamics saved: epoch 19, misranked: 0.0403, boundary: 0.0073, margin: 2.2655
+2025-09-25 01:10:55,740 - train - INFO - Epoch 19 完成:
+2025-09-25 01:10:55,740 - train - INFO -   训练损失: 0.6329
+2025-09-25 01:10:55,740 - train - INFO -   验证损失: 0.6321
+2025-09-25 01:10:55,740 - train - INFO -   能量分离: 2.2991
+2025-09-25 01:10:55,740 - train - INFO -   Val-AUROC: 0.9615 (AUPR: 0.9533, FPR95: 0.1717)
+2025-09-25 01:10:55,744 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,744 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9615
+2025-09-25 01:10:55,787 - train - INFO - Training dynamics saved: epoch 20, misranked: 0.0361, boundary: 0.0066, margin: 2.2807
+2025-09-25 01:10:55,787 - train - INFO - Epoch 20 完成:
+2025-09-25 01:10:55,787 - train - INFO -   训练损失: 0.6311
+2025-09-25 01:10:55,787 - train - INFO -   验证损失: 0.6311
+2025-09-25 01:10:55,787 - train - INFO -   能量分离: 2.3322
+2025-09-25 01:10:55,787 - train - INFO -   Val-AUROC: 0.9630 (AUPR: 0.9542, FPR95: 0.1667)
+2025-09-25 01:10:55,791 - train - INFO - ✅ 最佳模型已保存到 ./Appendixexp/lbap_general_ec50_size/best_model.pth
+2025-09-25 01:10:55,794 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_019.pth
+2025-09-25 01:10:55,795 - train - INFO - 清理旧文件: checkpoint_epoch_005.pth
+2025-09-25 01:10:55,795 - train - INFO - 🎉 epoch 发现更好模型! Val-AUROC: 0.9630
+2025-09-25 01:10:55,798 - train - INFO - 检查点已保存到 ./Appendixexp/lbap_general_ec50_size/checkpoint_epoch_019.pth
+2025-09-25 01:10:55,798 - train - INFO - 训练完成！
+2025-09-25 01:10:55,798 - train - INFO - 最佳 Val-AUROC: 0.9630
+2025-09-25 01:10:56,219 - __main__ - INFO - Training completed

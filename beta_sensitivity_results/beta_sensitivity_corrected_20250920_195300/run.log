@@ -1,0 +1,218 @@
+2025-09-20 19:53:00,328 - INFO - Starting beta sensitivity analysis...
+2025-09-20 19:53:00,328 - INFO - 
+=== Processing dataset: lbap_general_ec50_scaffold ===
+2025-09-20 19:53:00,328 - INFO - Preparing data for dataset: lbap_general_ec50_scaffold
+2025-09-20 19:53:00,464 - INFO - Dataset lbap_general_ec50_scaffold: Train batches: 313, Valid batches: 47
+2025-09-20 19:53:00,464 - INFO - Test set: 2000 ID + 2000 OOD samples
+2025-09-20 19:53:00,465 - INFO - Running experiment: beta_0.01_lbap_general_ec50_scaffold
+2025-09-20 19:53:03,732 - INFO - Epoch 0: Valid AUC: 0.8729
+2025-09-20 19:53:04,045 - INFO - Epoch 3: Valid AUC: 0.9033
+2025-09-20 19:53:04,347 - INFO - Epoch 6: Valid AUC: 0.9100
+2025-09-20 19:53:04,646 - INFO - Epoch 9: Valid AUC: 0.9212
+2025-09-20 19:53:04,646 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:53:30,944 - INFO - Beta 0.01: Valid AUC = 0.9212, TEST AUC = 0.9459
+2025-09-20 19:53:30,946 - INFO - Running experiment: beta_0.05_lbap_general_ec50_scaffold
+2025-09-20 19:53:31,067 - INFO - Epoch 0: Valid AUC: 0.8320
+2025-09-20 19:53:31,395 - INFO - Epoch 3: Valid AUC: 0.8810
+2025-09-20 19:53:31,721 - INFO - Epoch 6: Valid AUC: 0.9015
+2025-09-20 19:53:32,051 - INFO - Epoch 9: Valid AUC: 0.9111
+2025-09-20 19:53:32,051 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:53:53,919 - INFO - Beta 0.05: Valid AUC = 0.9122, TEST AUC = 0.9515
+2025-09-20 19:53:53,920 - INFO - Running experiment: beta_0.1_lbap_general_ec50_scaffold
+2025-09-20 19:53:54,046 - INFO - Epoch 0: Valid AUC: 0.8632
+2025-09-20 19:53:54,373 - INFO - Epoch 3: Valid AUC: 0.8889
+2025-09-20 19:53:54,689 - INFO - Epoch 6: Valid AUC: 0.9056
+2025-09-20 19:53:55,001 - INFO - Epoch 9: Valid AUC: 0.9125
+2025-09-20 19:53:55,002 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:54:16,285 - INFO - Beta 0.1: Valid AUC = 0.9125, TEST AUC = 0.9364
+2025-09-20 19:54:16,286 - INFO - Running experiment: beta_0.2_lbap_general_ec50_scaffold
+2025-09-20 19:54:16,414 - INFO - Epoch 0: Valid AUC: 0.8269
+2025-09-20 19:54:16,734 - INFO - Epoch 3: Valid AUC: 0.8718
+2025-09-20 19:54:17,041 - INFO - Epoch 6: Valid AUC: 0.8997
+2025-09-20 19:54:17,347 - INFO - Epoch 9: Valid AUC: 0.9125
+2025-09-20 19:54:17,348 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:54:39,427 - INFO - Beta 0.2: Valid AUC = 0.9125, TEST AUC = 0.9402
+2025-09-20 19:54:39,428 - INFO - Running experiment: beta_0.5_lbap_general_ec50_scaffold
+2025-09-20 19:54:39,545 - INFO - Epoch 0: Valid AUC: 0.8126
+2025-09-20 19:54:39,870 - INFO - Epoch 3: Valid AUC: 0.8724
+2025-09-20 19:54:40,194 - INFO - Epoch 6: Valid AUC: 0.8871
+2025-09-20 19:54:40,515 - INFO - Epoch 9: Valid AUC: 0.9065
+2025-09-20 19:54:40,516 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:55:01,543 - INFO - Beta 0.5: Valid AUC = 0.9065, TEST AUC = 0.9344
+2025-09-20 19:55:01,544 - INFO - Running experiment: beta_1.0_lbap_general_ec50_scaffold
+2025-09-20 19:55:01,660 - INFO - Epoch 0: Valid AUC: 0.8187
+2025-09-20 19:55:01,974 - INFO - Epoch 3: Valid AUC: 0.8738
+2025-09-20 19:55:02,280 - INFO - Epoch 6: Valid AUC: 0.8948
+2025-09-20 19:55:02,583 - INFO - Epoch 9: Valid AUC: 0.9074
+2025-09-20 19:55:02,583 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:55:23,606 - INFO - Beta 1.0: Valid AUC = 0.9074, TEST AUC = 0.9398
+2025-09-20 19:55:23,607 - INFO - Running experiment: beta_2.0_lbap_general_ec50_scaffold
+2025-09-20 19:55:23,723 - INFO - Epoch 0: Valid AUC: 0.8259
+2025-09-20 19:55:24,056 - INFO - Epoch 3: Valid AUC: 0.8710
+2025-09-20 19:55:24,378 - INFO - Epoch 6: Valid AUC: 0.8992
+2025-09-20 19:55:24,688 - INFO - Epoch 9: Valid AUC: 0.9179
+2025-09-20 19:55:24,688 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:55:45,725 - INFO - Beta 2.0: Valid AUC = 0.9179, TEST AUC = 0.9472
+2025-09-20 19:55:45,726 - INFO - Running experiment: beta_5.0_lbap_general_ec50_scaffold
+2025-09-20 19:55:45,848 - INFO - Epoch 0: Valid AUC: 0.8599
+2025-09-20 19:55:46,178 - INFO - Epoch 3: Valid AUC: 0.8963
+2025-09-20 19:55:46,490 - INFO - Epoch 6: Valid AUC: 0.9133
+2025-09-20 19:55:46,811 - INFO - Epoch 9: Valid AUC: 0.9195
+2025-09-20 19:55:46,812 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:56:08,108 - INFO - Beta 5.0: Valid AUC = 0.9195, TEST AUC = 0.9531
+2025-09-20 19:56:08,108 - INFO - Running experiment: beta_10.0_lbap_general_ec50_scaffold
+2025-09-20 19:56:08,234 - INFO - Epoch 0: Valid AUC: 0.8242
+2025-09-20 19:56:08,558 - INFO - Epoch 3: Valid AUC: 0.8960
+2025-09-20 19:56:08,879 - INFO - Epoch 6: Valid AUC: 0.9116
+2025-09-20 19:56:09,187 - INFO - Epoch 9: Valid AUC: 0.9247
+2025-09-20 19:56:09,188 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:56:31,161 - INFO - Beta 10.0: Valid AUC = 0.9247, TEST AUC = 0.9524
+2025-09-20 19:56:31,162 - INFO - 
+=== Processing dataset: lbap_general_ec50_size ===
+2025-09-20 19:56:31,162 - INFO - Preparing data for dataset: lbap_general_ec50_size
+2025-09-20 19:56:32,163 - INFO - Dataset lbap_general_ec50_size: Train batches: 313, Valid batches: 47
+2025-09-20 19:56:32,163 - INFO - Test set: 2000 ID + 2000 OOD samples
+2025-09-20 19:56:32,235 - INFO - Running experiment: beta_0.01_lbap_general_ec50_size
+2025-09-20 19:56:32,515 - INFO - Epoch 0: Valid AUC: 0.8806
+2025-09-20 19:56:32,825 - INFO - Epoch 3: Valid AUC: 0.9554
+2025-09-20 19:56:33,140 - INFO - Epoch 6: Valid AUC: 0.9608
+2025-09-20 19:56:33,443 - INFO - Epoch 9: Valid AUC: 0.9622
+2025-09-20 19:56:33,444 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:56:56,781 - INFO - Beta 0.01: Valid AUC = 0.9677, TEST AUC = 0.9993
+2025-09-20 19:56:56,783 - INFO - Running experiment: beta_0.05_lbap_general_ec50_size
+2025-09-20 19:56:56,922 - INFO - Epoch 0: Valid AUC: 0.8997
+2025-09-20 19:56:57,254 - INFO - Epoch 3: Valid AUC: 0.9550
+2025-09-20 19:56:57,573 - INFO - Epoch 6: Valid AUC: 0.9658
+2025-09-20 19:56:57,891 - INFO - Epoch 9: Valid AUC: 0.9706
+2025-09-20 19:56:57,892 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:57:19,576 - INFO - Beta 0.05: Valid AUC = 0.9707, TEST AUC = 0.9990
+2025-09-20 19:57:19,577 - INFO - Running experiment: beta_0.1_lbap_general_ec50_size
+2025-09-20 19:57:19,699 - INFO - Epoch 0: Valid AUC: 0.9156
+2025-09-20 19:57:20,032 - INFO - Epoch 3: Valid AUC: 0.9504
+2025-09-20 19:57:20,360 - INFO - Epoch 6: Valid AUC: 0.9615
+2025-09-20 19:57:20,687 - INFO - Epoch 9: Valid AUC: 0.9667
+2025-09-20 19:57:20,687 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:57:42,206 - INFO - Beta 0.1: Valid AUC = 0.9667, TEST AUC = 0.9986
+2025-09-20 19:57:42,207 - INFO - Running experiment: beta_0.2_lbap_general_ec50_size
+2025-09-20 19:57:42,322 - INFO - Epoch 0: Valid AUC: 0.8705
+2025-09-20 19:57:42,647 - INFO - Epoch 3: Valid AUC: 0.9430
+2025-09-20 19:57:42,973 - INFO - Epoch 6: Valid AUC: 0.9653
+2025-09-20 19:57:43,297 - INFO - Epoch 9: Valid AUC: 0.9689
+2025-09-20 19:57:43,298 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:58:04,941 - INFO - Beta 0.2: Valid AUC = 0.9689, TEST AUC = 0.9987
+2025-09-20 19:58:04,941 - INFO - Running experiment: beta_0.5_lbap_general_ec50_size
+2025-09-20 19:58:05,063 - INFO - Epoch 0: Valid AUC: 0.9355
+2025-09-20 19:58:05,410 - INFO - Epoch 3: Valid AUC: 0.9454
+2025-09-20 19:58:05,754 - INFO - Epoch 6: Valid AUC: 0.9695
+2025-09-20 19:58:06,086 - INFO - Epoch 9: Valid AUC: 0.9722
+2025-09-20 19:58:06,087 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:58:27,968 - INFO - Beta 0.5: Valid AUC = 0.9722, TEST AUC = 0.9989
+2025-09-20 19:58:27,969 - INFO - Running experiment: beta_1.0_lbap_general_ec50_size
+2025-09-20 19:58:28,092 - INFO - Epoch 0: Valid AUC: 0.9309
+2025-09-20 19:58:28,428 - INFO - Epoch 3: Valid AUC: 0.9466
+2025-09-20 19:58:28,732 - INFO - Epoch 6: Valid AUC: 0.9619
+2025-09-20 19:58:29,033 - INFO - Epoch 9: Valid AUC: 0.9667
+2025-09-20 19:58:29,034 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:58:51,012 - INFO - Beta 1.0: Valid AUC = 0.9667, TEST AUC = 0.9992
+2025-09-20 19:58:51,013 - INFO - Running experiment: beta_2.0_lbap_general_ec50_size
+2025-09-20 19:58:51,123 - INFO - Epoch 0: Valid AUC: 0.9271
+2025-09-20 19:58:51,448 - INFO - Epoch 3: Valid AUC: 0.9564
+2025-09-20 19:58:51,761 - INFO - Epoch 6: Valid AUC: 0.9658
+2025-09-20 19:58:52,086 - INFO - Epoch 9: Valid AUC: 0.9722
+2025-09-20 19:58:52,086 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:59:14,266 - INFO - Beta 2.0: Valid AUC = 0.9722, TEST AUC = 0.9994
+2025-09-20 19:59:14,267 - INFO - Running experiment: beta_5.0_lbap_general_ec50_size
+2025-09-20 19:59:14,382 - INFO - Epoch 0: Valid AUC: 0.9363
+2025-09-20 19:59:14,717 - INFO - Epoch 3: Valid AUC: 0.9637
+2025-09-20 19:59:15,048 - INFO - Epoch 6: Valid AUC: 0.9717
+2025-09-20 19:59:15,379 - INFO - Epoch 9: Valid AUC: 0.9747
+2025-09-20 19:59:15,380 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 19:59:37,924 - INFO - Beta 5.0: Valid AUC = 0.9759, TEST AUC = 0.9997
+2025-09-20 19:59:37,925 - INFO - Running experiment: beta_10.0_lbap_general_ec50_size
+2025-09-20 19:59:38,043 - INFO - Epoch 0: Valid AUC: 0.9213
+2025-09-20 19:59:38,381 - INFO - Epoch 3: Valid AUC: 0.9635
+2025-09-20 19:59:38,702 - INFO - Epoch 6: Valid AUC: 0.9662
+2025-09-20 19:59:39,028 - INFO - Epoch 9: Valid AUC: 0.9675
+2025-09-20 19:59:39,028 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:00:01,918 - INFO - Beta 10.0: Valid AUC = 0.9675, TEST AUC = 0.9995
+2025-09-20 20:00:01,919 - INFO - 
+=== Processing dataset: lbap_general_ec50_assay ===
+2025-09-20 20:00:01,919 - INFO - Preparing data for dataset: lbap_general_ec50_assay
+2025-09-20 20:00:03,619 - INFO - Dataset lbap_general_ec50_assay: Train batches: 313, Valid batches: 47
+2025-09-20 20:00:03,619 - INFO - Test set: 2000 ID + 2000 OOD samples
+2025-09-20 20:00:03,725 - INFO - Running experiment: beta_0.01_lbap_general_ec50_assay
+2025-09-20 20:00:04,016 - INFO - Epoch 0: Valid AUC: 0.6304
+2025-09-20 20:00:04,344 - INFO - Epoch 3: Valid AUC: 0.6779
+2025-09-20 20:00:04,661 - INFO - Epoch 6: Valid AUC: 0.6880
+2025-09-20 20:00:04,975 - INFO - Epoch 9: Valid AUC: 0.6978
+2025-09-20 20:00:04,975 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:00:30,118 - INFO - Beta 0.01: Valid AUC = 0.6985, TEST AUC = 0.6500
+2025-09-20 20:00:30,120 - INFO - Running experiment: beta_0.05_lbap_general_ec50_assay
+2025-09-20 20:00:30,272 - INFO - Epoch 0: Valid AUC: 0.5942
+2025-09-20 20:00:30,607 - INFO - Epoch 3: Valid AUC: 0.6475
+2025-09-20 20:00:30,937 - INFO - Epoch 6: Valid AUC: 0.6625
+2025-09-20 20:00:31,244 - INFO - Epoch 9: Valid AUC: 0.6798
+2025-09-20 20:00:31,245 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:00:55,333 - INFO - Beta 0.05: Valid AUC = 0.6798, TEST AUC = 0.6605
+2025-09-20 20:00:55,334 - INFO - Running experiment: beta_0.1_lbap_general_ec50_assay
+2025-09-20 20:00:55,459 - INFO - Epoch 0: Valid AUC: 0.5872
+2025-09-20 20:00:55,787 - INFO - Epoch 3: Valid AUC: 0.6563
+2025-09-20 20:00:56,103 - INFO - Epoch 6: Valid AUC: 0.6603
+2025-09-20 20:00:56,416 - INFO - Epoch 9: Valid AUC: 0.6803
+2025-09-20 20:00:56,416 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:01:20,028 - INFO - Beta 0.1: Valid AUC = 0.6803, TEST AUC = 0.6668
+2025-09-20 20:01:20,029 - INFO - Running experiment: beta_0.2_lbap_general_ec50_assay
+2025-09-20 20:01:20,161 - INFO - Epoch 0: Valid AUC: 0.6278
+2025-09-20 20:01:20,494 - INFO - Epoch 3: Valid AUC: 0.6646
+2025-09-20 20:01:20,815 - INFO - Epoch 6: Valid AUC: 0.6763
+2025-09-20 20:01:21,134 - INFO - Epoch 9: Valid AUC: 0.6802
+2025-09-20 20:01:21,135 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:01:44,501 - INFO - Beta 0.2: Valid AUC = 0.6802, TEST AUC = 0.6720
+2025-09-20 20:01:44,502 - INFO - Running experiment: beta_0.5_lbap_general_ec50_assay
+2025-09-20 20:01:44,636 - INFO - Epoch 0: Valid AUC: 0.6133
+2025-09-20 20:01:44,969 - INFO - Epoch 3: Valid AUC: 0.6514
+2025-09-20 20:01:45,303 - INFO - Epoch 6: Valid AUC: 0.6691
+2025-09-20 20:01:45,628 - INFO - Epoch 9: Valid AUC: 0.6772
+2025-09-20 20:01:45,628 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:02:10,133 - INFO - Beta 0.5: Valid AUC = 0.6772, TEST AUC = 0.6773
+2025-09-20 20:02:10,134 - INFO - Running experiment: beta_1.0_lbap_general_ec50_assay
+2025-09-20 20:02:10,248 - INFO - Epoch 0: Valid AUC: 0.6149
+2025-09-20 20:02:10,582 - INFO - Epoch 3: Valid AUC: 0.6544
+2025-09-20 20:02:10,908 - INFO - Epoch 6: Valid AUC: 0.6686
+2025-09-20 20:02:11,224 - INFO - Epoch 9: Valid AUC: 0.6696
+2025-09-20 20:02:11,224 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:02:34,680 - INFO - Beta 1.0: Valid AUC = 0.6696, TEST AUC = 0.6591
+2025-09-20 20:02:34,681 - INFO - Running experiment: beta_2.0_lbap_general_ec50_assay
+2025-09-20 20:02:34,811 - INFO - Epoch 0: Valid AUC: 0.6155
+2025-09-20 20:02:35,133 - INFO - Epoch 3: Valid AUC: 0.6668
+2025-09-20 20:02:35,437 - INFO - Epoch 6: Valid AUC: 0.6785
+2025-09-20 20:02:35,742 - INFO - Epoch 9: Valid AUC: 0.6876
+2025-09-20 20:02:35,742 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:03:00,168 - INFO - Beta 2.0: Valid AUC = 0.6876, TEST AUC = 0.6765
+2025-09-20 20:03:00,169 - INFO - Running experiment: beta_5.0_lbap_general_ec50_assay
+2025-09-20 20:03:00,286 - INFO - Epoch 0: Valid AUC: 0.5656
+2025-09-20 20:03:00,616 - INFO - Epoch 3: Valid AUC: 0.6573
+2025-09-20 20:03:00,949 - INFO - Epoch 6: Valid AUC: 0.6667
+2025-09-20 20:03:01,275 - INFO - Epoch 9: Valid AUC: 0.6541
+2025-09-20 20:03:01,275 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:03:24,965 - INFO - Beta 5.0: Valid AUC = 0.6667, TEST AUC = 0.6749
+2025-09-20 20:03:24,966 - INFO - Running experiment: beta_10.0_lbap_general_ec50_assay
+2025-09-20 20:03:25,093 - INFO - Epoch 0: Valid AUC: 0.6149
+2025-09-20 20:03:25,423 - INFO - Epoch 3: Valid AUC: 0.6706
+2025-09-20 20:03:25,733 - INFO - Epoch 6: Valid AUC: 0.6866
+2025-09-20 20:03:26,033 - INFO - Epoch 9: Valid AUC: 0.6856
+2025-09-20 20:03:26,033 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 20:03:49,600 - INFO - Beta 10.0: Valid AUC = 0.6915, TEST AUC = 0.6659
+2025-09-20 20:03:49,601 - INFO - Beta sensitivity analysis completed!
+2025-09-20 20:03:49,760 - INFO - Creating plots based on TEST SET performance...
+2025-09-20 20:03:50,884 - INFO - Corrected plots saved to: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300/beta_sensitivity_TEST_AUC.png
+2025-09-20 20:03:51,187 - INFO - Saved per-dataset tight-scale plot: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300/beta_sensitivity_TEST_AUC_EC50_Scaffold.png
+2025-09-20 20:03:51,486 - INFO - Saved per-dataset tight-scale plot: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300/beta_sensitivity_TEST_AUC_EC50_Size.png
+2025-09-20 20:03:51,496 - WARNING - Adjusted y-limits for EC50 Assay from (0.72, 0.77) to (0.645, 0.682) to fit data range [0.6500, 0.6773].
+2025-09-20 20:03:51,807 - INFO - Saved per-dataset tight-scale plot: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300/beta_sensitivity_TEST_AUC_EC50_Assay.png
+2025-09-20 20:03:51,807 - INFO - Saving results...
+2025-09-20 20:03:51,809 - INFO - Results saved to: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300/beta_sensitivity_TEST_results.csv
+2025-09-20 20:03:51,812 - INFO - Corrected analysis report saved to: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300/corrected_analysis_report.md
+2025-09-20 20:03:51,812 - INFO - 修正版Beta sensitivity analysis completed successfully!
+2025-09-20 20:03:51,812 - INFO - Results saved in: ./beta_sensitivity_results/beta_sensitivity_corrected_20250920_195300
+2025-09-20 20:03:51,813 - INFO - ⚠️  此版本确保所有结果基于真实的TEST SET性能评估

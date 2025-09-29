@@ -1,0 +1,174 @@
+2025-09-20 23:20:10,205 - INFO - Starting lambda sensitivity analysis...
+2025-09-20 23:20:10,205 - INFO - 
+=== Processing dataset: lbap_general_ec50_scaffold ===
+2025-09-20 23:20:10,205 - INFO - Preparing data for dataset: lbap_general_ec50_scaffold
+2025-09-20 23:20:10,321 - INFO - Dataset lbap_general_ec50_scaffold: Train batches: 313, Valid batches: 47
+2025-09-20 23:20:10,321 - INFO - Test set: 2000 ID + 2000 OOD samples
+2025-09-20 23:20:10,323 - INFO - Running experiment: lambda_0.01_lbap_general_ec50_scaffold
+2025-09-20 23:20:13,381 - INFO - Epoch 0: Valid AUC: 0.8745
+2025-09-20 23:20:13,702 - INFO - Epoch 3: Valid AUC: 0.8834
+2025-09-20 23:20:13,998 - INFO - Epoch 6: Valid AUC: 0.9025
+2025-09-20 23:20:14,282 - INFO - Epoch 9: Valid AUC: 0.9104
+2025-09-20 23:20:14,283 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:20:40,347 - INFO - Lambda 0.01: Valid AUC = 0.9104, TEST AUC = 0.9334
+2025-09-20 23:20:40,348 - INFO - Running experiment: lambda_0.05_lbap_general_ec50_scaffold
+2025-09-20 23:20:40,472 - INFO - Epoch 0: Valid AUC: 0.8311
+2025-09-20 23:20:40,809 - INFO - Epoch 3: Valid AUC: 0.8857
+2025-09-20 23:20:41,136 - INFO - Epoch 6: Valid AUC: 0.9067
+2025-09-20 23:20:41,458 - INFO - Epoch 9: Valid AUC: 0.9094
+2025-09-20 23:20:41,458 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:21:02,707 - INFO - Lambda 0.05: Valid AUC = 0.9143, TEST AUC = 0.9542
+2025-09-20 23:21:02,708 - INFO - Running experiment: lambda_0.1_lbap_general_ec50_scaffold
+2025-09-20 23:21:02,827 - INFO - Epoch 0: Valid AUC: 0.8702
+2025-09-20 23:21:03,148 - INFO - Epoch 3: Valid AUC: 0.9016
+2025-09-20 23:21:03,466 - INFO - Epoch 6: Valid AUC: 0.9152
+2025-09-20 23:21:03,788 - INFO - Epoch 9: Valid AUC: 0.9252
+2025-09-20 23:21:03,788 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:21:26,158 - INFO - Lambda 0.1: Valid AUC = 0.9252, TEST AUC = 0.9486
+2025-09-20 23:21:26,159 - INFO - Running experiment: lambda_0.5_lbap_general_ec50_scaffold
+2025-09-20 23:21:26,281 - INFO - Epoch 0: Valid AUC: 0.6942
+2025-09-20 23:21:26,617 - INFO - Epoch 3: Valid AUC: 0.8341
+2025-09-20 23:21:26,934 - INFO - Epoch 6: Valid AUC: 0.8788
+2025-09-20 23:21:27,263 - INFO - Epoch 9: Valid AUC: 0.9004
+2025-09-20 23:21:27,263 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:21:48,082 - INFO - Lambda 0.5: Valid AUC = 0.9004, TEST AUC = 0.9193
+2025-09-20 23:21:48,083 - INFO - Running experiment: lambda_1.0_lbap_general_ec50_scaffold
+2025-09-20 23:21:48,201 - INFO - Epoch 0: Valid AUC: 0.6503
+2025-09-20 23:21:48,534 - INFO - Epoch 3: Valid AUC: 0.7525
+2025-09-20 23:21:48,864 - INFO - Epoch 6: Valid AUC: 0.8370
+2025-09-20 23:21:49,192 - INFO - Epoch 9: Valid AUC: 0.8684
+2025-09-20 23:21:49,192 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:22:10,770 - INFO - Lambda 1.0: Valid AUC = 0.8684, TEST AUC = 0.8809
+2025-09-20 23:22:10,771 - INFO - Running experiment: lambda_2.0_lbap_general_ec50_scaffold
+2025-09-20 23:22:10,894 - INFO - Epoch 0: Valid AUC: 0.6434
+2025-09-20 23:22:11,229 - INFO - Epoch 3: Valid AUC: 0.6781
+2025-09-20 23:22:11,555 - INFO - Epoch 6: Valid AUC: 0.7082
+2025-09-20 23:22:11,880 - INFO - Epoch 9: Valid AUC: 0.7464
+2025-09-20 23:22:11,881 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:22:33,266 - INFO - Lambda 2.0: Valid AUC = 0.7601, TEST AUC = 0.7931
+2025-09-20 23:22:33,267 - INFO - Running experiment: lambda_5.0_lbap_general_ec50_scaffold
+2025-09-20 23:22:33,382 - INFO - Epoch 0: Valid AUC: 0.5843
+2025-09-20 23:22:33,703 - INFO - Epoch 3: Valid AUC: 0.5963
+2025-09-20 23:22:34,010 - INFO - Epoch 6: Valid AUC: 0.6149
+2025-09-20 23:22:34,313 - INFO - Epoch 9: Valid AUC: 0.6581
+2025-09-20 23:22:34,313 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:22:55,237 - INFO - Lambda 5.0: Valid AUC = 0.6581, TEST AUC = 0.7482
+2025-09-20 23:22:55,238 - INFO - 
+=== Processing dataset: lbap_general_ec50_size ===
+2025-09-20 23:22:55,238 - INFO - Preparing data for dataset: lbap_general_ec50_size
+2025-09-20 23:22:56,042 - INFO - Dataset lbap_general_ec50_size: Train batches: 313, Valid batches: 47
+2025-09-20 23:22:56,042 - INFO - Test set: 2000 ID + 2000 OOD samples
+2025-09-20 23:22:56,112 - INFO - Running experiment: lambda_0.01_lbap_general_ec50_size
+2025-09-20 23:22:56,399 - INFO - Epoch 0: Valid AUC: 0.9030
+2025-09-20 23:22:56,733 - INFO - Epoch 3: Valid AUC: 0.9446
+2025-09-20 23:22:57,061 - INFO - Epoch 6: Valid AUC: 0.9635
+2025-09-20 23:22:57,390 - INFO - Epoch 9: Valid AUC: 0.9672
+2025-09-20 23:22:57,390 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:23:19,918 - INFO - Lambda 0.01: Valid AUC = 0.9672, TEST AUC = 0.9989
+2025-09-20 23:23:19,919 - INFO - Running experiment: lambda_0.05_lbap_general_ec50_size
+2025-09-20 23:23:20,043 - INFO - Epoch 0: Valid AUC: 0.9066
+2025-09-20 23:23:20,379 - INFO - Epoch 3: Valid AUC: 0.9524
+2025-09-20 23:23:20,703 - INFO - Epoch 6: Valid AUC: 0.9635
+2025-09-20 23:23:21,028 - INFO - Epoch 9: Valid AUC: 0.9704
+2025-09-20 23:23:21,028 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:23:43,518 - INFO - Lambda 0.05: Valid AUC = 0.9704, TEST AUC = 0.9994
+2025-09-20 23:23:43,519 - INFO - Running experiment: lambda_0.1_lbap_general_ec50_size
+2025-09-20 23:23:43,648 - INFO - Epoch 0: Valid AUC: 0.9080
+2025-09-20 23:23:43,981 - INFO - Epoch 3: Valid AUC: 0.9557
+2025-09-20 23:23:44,310 - INFO - Epoch 6: Valid AUC: 0.9635
+2025-09-20 23:23:44,642 - INFO - Epoch 9: Valid AUC: 0.9669
+2025-09-20 23:23:44,642 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:24:07,287 - INFO - Lambda 0.1: Valid AUC = 0.9683, TEST AUC = 0.9992
+2025-09-20 23:24:07,288 - INFO - Running experiment: lambda_0.5_lbap_general_ec50_size
+2025-09-20 23:24:07,416 - INFO - Epoch 0: Valid AUC: 0.8324
+2025-09-20 23:24:07,774 - INFO - Epoch 3: Valid AUC: 0.9274
+2025-09-20 23:24:08,094 - INFO - Epoch 6: Valid AUC: 0.9457
+2025-09-20 23:24:08,410 - INFO - Epoch 9: Valid AUC: 0.9530
+2025-09-20 23:24:08,410 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:24:30,763 - INFO - Lambda 0.5: Valid AUC = 0.9530, TEST AUC = 0.9978
+2025-09-20 23:24:30,764 - INFO - Running experiment: lambda_1.0_lbap_general_ec50_size
+2025-09-20 23:24:30,889 - INFO - Epoch 0: Valid AUC: 0.6992
+2025-09-20 23:24:31,210 - INFO - Epoch 3: Valid AUC: 0.8371
+2025-09-20 23:24:31,520 - INFO - Epoch 6: Valid AUC: 0.8885
+2025-09-20 23:24:31,829 - INFO - Epoch 9: Valid AUC: 0.9157
+2025-09-20 23:24:31,830 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:24:53,918 - INFO - Lambda 1.0: Valid AUC = 0.9157, TEST AUC = 0.9898
+2025-09-20 23:24:53,919 - INFO - Running experiment: lambda_2.0_lbap_general_ec50_size
+2025-09-20 23:24:54,035 - INFO - Epoch 0: Valid AUC: 0.6476
+2025-09-20 23:24:54,374 - INFO - Epoch 3: Valid AUC: 0.7214
+2025-09-20 23:24:54,697 - INFO - Epoch 6: Valid AUC: 0.8290
+2025-09-20 23:24:55,022 - INFO - Epoch 9: Valid AUC: 0.8527
+2025-09-20 23:24:55,022 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:25:16,986 - INFO - Lambda 2.0: Valid AUC = 0.8527, TEST AUC = 0.9447
+2025-09-20 23:25:16,987 - INFO - Running experiment: lambda_5.0_lbap_general_ec50_size
+2025-09-20 23:25:17,104 - INFO - Epoch 0: Valid AUC: 0.6093
+2025-09-20 23:25:17,431 - INFO - Epoch 3: Valid AUC: 0.6214
+2025-09-20 23:25:17,765 - INFO - Epoch 6: Valid AUC: 0.6433
+2025-09-20 23:25:18,093 - INFO - Epoch 9: Valid AUC: 0.5889
+2025-09-20 23:25:18,093 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:25:39,955 - INFO - Lambda 5.0: Valid AUC = 0.6433, TEST AUC = 0.5697
+2025-09-20 23:25:39,956 - INFO - 
+=== Processing dataset: lbap_general_ec50_assay ===
+2025-09-20 23:25:39,956 - INFO - Preparing data for dataset: lbap_general_ec50_assay
+2025-09-20 23:25:41,502 - INFO - Dataset lbap_general_ec50_assay: Train batches: 313, Valid batches: 47
+2025-09-20 23:25:41,502 - INFO - Test set: 2000 ID + 2000 OOD samples
+2025-09-20 23:25:41,608 - INFO - Running experiment: lambda_0.01_lbap_general_ec50_assay
+2025-09-20 23:25:41,897 - INFO - Epoch 0: Valid AUC: 0.6260
+2025-09-20 23:25:42,226 - INFO - Epoch 3: Valid AUC: 0.6634
+2025-09-20 23:25:42,552 - INFO - Epoch 6: Valid AUC: 0.6792
+2025-09-20 23:25:42,867 - INFO - Epoch 9: Valid AUC: 0.6868
+2025-09-20 23:25:42,868 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:26:07,887 - INFO - Lambda 0.01: Valid AUC = 0.6868, TEST AUC = 0.6585
+2025-09-20 23:26:07,888 - INFO - Running experiment: lambda_0.05_lbap_general_ec50_assay
+2025-09-20 23:26:08,022 - INFO - Epoch 0: Valid AUC: 0.5919
+2025-09-20 23:26:08,352 - INFO - Epoch 3: Valid AUC: 0.6608
+2025-09-20 23:26:08,682 - INFO - Epoch 6: Valid AUC: 0.6836
+2025-09-20 23:26:09,011 - INFO - Epoch 9: Valid AUC: 0.6955
+2025-09-20 23:26:09,011 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:26:32,952 - INFO - Lambda 0.05: Valid AUC = 0.6955, TEST AUC = 0.6482
+2025-09-20 23:26:32,953 - INFO - Running experiment: lambda_0.1_lbap_general_ec50_assay
+2025-09-20 23:26:33,070 - INFO - Epoch 0: Valid AUC: 0.5921
+2025-09-20 23:26:33,387 - INFO - Epoch 3: Valid AUC: 0.6476
+2025-09-20 23:26:33,698 - INFO - Epoch 6: Valid AUC: 0.6656
+2025-09-20 23:26:34,004 - INFO - Epoch 9: Valid AUC: 0.6910
+2025-09-20 23:26:34,004 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:26:58,074 - INFO - Lambda 0.1: Valid AUC = 0.6910, TEST AUC = 0.6576
+2025-09-20 23:26:58,075 - INFO - Running experiment: lambda_0.5_lbap_general_ec50_assay
+2025-09-20 23:26:58,193 - INFO - Epoch 0: Valid AUC: 0.5629
+2025-09-20 23:26:58,528 - INFO - Epoch 3: Valid AUC: 0.6182
+2025-09-20 23:26:58,859 - INFO - Epoch 6: Valid AUC: 0.6101
+2025-09-20 23:26:59,192 - INFO - Epoch 9: Valid AUC: 0.6740
+2025-09-20 23:26:59,193 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:27:22,926 - INFO - Lambda 0.5: Valid AUC = 0.6740, TEST AUC = 0.6342
+2025-09-20 23:27:22,926 - INFO - Running experiment: lambda_1.0_lbap_general_ec50_assay
+2025-09-20 23:27:23,048 - INFO - Epoch 0: Valid AUC: 0.5578
+2025-09-20 23:27:23,394 - INFO - Epoch 3: Valid AUC: 0.6107
+2025-09-20 23:27:23,727 - INFO - Epoch 6: Valid AUC: 0.6105
+2025-09-20 23:27:24,056 - INFO - Epoch 9: Valid AUC: 0.5785
+2025-09-20 23:27:24,056 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:27:47,848 - INFO - Lambda 1.0: Valid AUC = 0.6122, TEST AUC = 0.5819
+2025-09-20 23:27:47,849 - INFO - Running experiment: lambda_2.0_lbap_general_ec50_assay
+2025-09-20 23:27:47,989 - INFO - Epoch 0: Valid AUC: 0.4937
+2025-09-20 23:27:48,319 - INFO - Epoch 3: Valid AUC: 0.5400
+2025-09-20 23:27:48,642 - INFO - Epoch 6: Valid AUC: 0.5512
+2025-09-20 23:27:48,963 - INFO - Epoch 9: Valid AUC: 0.5884
+2025-09-20 23:27:48,963 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:28:12,297 - INFO - Lambda 2.0: Valid AUC = 0.5884, TEST AUC = 0.5921
+2025-09-20 23:28:12,298 - INFO - Running experiment: lambda_5.0_lbap_general_ec50_assay
+2025-09-20 23:28:12,431 - INFO - Epoch 0: Valid AUC: 0.4867
+2025-09-20 23:28:12,763 - INFO - Epoch 3: Valid AUC: 0.5196
+2025-09-20 23:28:13,090 - INFO - Epoch 6: Valid AUC: 0.5041
+2025-09-20 23:28:13,405 - INFO - Epoch 9: Valid AUC: 0.5132
+2025-09-20 23:28:13,405 - INFO - Evaluating final performance on TEST SET...
+2025-09-20 23:28:36,874 - INFO - Lambda 5.0: Valid AUC = 0.5200, TEST AUC = 0.5138
+2025-09-20 23:28:36,875 - INFO - Lambda sensitivity analysis completed!
+2025-09-20 23:28:37,037 - INFO - Creating plots based on TEST SET performance...
+2025-09-20 23:28:37,304 - INFO - Saved per-dataset plot: ./lambda_sensitivity_results/lambda_sensitivity_20250920_232010/lambda_sensitivity_TEST_AUC_EC50_Scaffold.png
+2025-09-20 23:28:37,518 - INFO - Saved per-dataset plot: ./lambda_sensitivity_results/lambda_sensitivity_20250920_232010/lambda_sensitivity_TEST_AUC_EC50_Size.png
+2025-09-20 23:28:37,742 - INFO - Saved per-dataset plot: ./lambda_sensitivity_results/lambda_sensitivity_20250920_232010/lambda_sensitivity_TEST_AUC_EC50_Assay.png
+2025-09-20 23:28:37,742 - INFO - Saving results...
+2025-09-20 23:28:37,743 - INFO - Results saved to: ./lambda_sensitivity_results/lambda_sensitivity_20250920_232010/lambda_sensitivity_TEST_results.csv
+2025-09-20 23:28:37,747 - INFO - Analysis report saved to: ./lambda_sensitivity_results/lambda_sensitivity_20250920_232010/lambda_analysis_report.md
+2025-09-20 23:28:37,747 - INFO - Lambda sensitivity analysis completed successfully!
+2025-09-20 23:28:37,747 - INFO - Results saved in: ./lambda_sensitivity_results/lambda_sensitivity_20250920_232010
+2025-09-20 23:28:37,747 - INFO - ⚠️  此版本确保所有结果基于真实的TEST SET性能评估
