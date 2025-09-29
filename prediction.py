@@ -62,11 +62,11 @@ class EnergyDPOPredictor:
     
     def predict_with_threshold(self, smiles_list, batch_size=64):
         """
-        使用阈值预测OOD标签
-        
+        Predict OOD labels using threshold
+
         Returns:
-            scores: 能量分数
-            predictions: 二进制预测(1=OOD, 0=ID)
+            scores: Energy scores
+            predictions: Binary predictions (1=OOD, 0=ID)
         """
         scores = self.predict_batch(smiles_list, batch_size)
         
@@ -118,7 +118,7 @@ class EnergyDPOPredictor:
         logger.info(f"阈值设置为 {threshold}")
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Energy-DPO预测')
+    parser = argparse.ArgumentParser(description='Energy-DPO Prediction')
     
     # 模型
     parser.add_argument("--model_path", type=str, required=True)

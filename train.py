@@ -102,43 +102,43 @@ class EnergyDPOTrainer:
                 # Load optimizer state  
                 if 'optimizer_state_dict' in checkpoint:
                     self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-                    logger.info("✅ Optimizer state loaded")
+                    logger.info("Optimizer state loaded")
                 
                 # Load scheduler state
                 if 'scheduler_state_dict' in checkpoint:
                     self.scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
-                    logger.info("✅ Scheduler state loaded")
+                    logger.info("Scheduler state loaded")
                 
                 # Load training state
                 if 'epoch' in checkpoint:
-                    self.start_epoch = checkpoint['epoch'] + 1  # 从下一个epoch开始
-                    logger.info(f"✅ Will continue training from epoch {self.start_epoch + 1}")
+                    self.start_epoch = checkpoint['epoch'] + 1  # Start from next epoch
+                    logger.info(f"Will continue training from epoch {self.start_epoch + 1}")
                 
                 if 'global_step' in checkpoint:
                     self.global_step = checkpoint['global_step']
-                    logger.info(f"✅ Global step: {self.global_step}")
+                    logger.info(f"Global step: {self.global_step}")
                 
                 if 'best_eval_metric' in checkpoint:
                     self.best_eval_metric = checkpoint['best_eval_metric']
-                    logger.info(f"✅ Best metric: {self.best_eval_metric:.4f}")
+                    logger.info(f"Best metric: {self.best_eval_metric:.4f}")
                 
-                logger.info(f"🎉 Successfully restored training state from checkpoint!")
+                logger.info(f"Successfully restored training state from checkpoint!")
                 
             except Exception as e:
-                logger.error(f"❌ Failed to load checkpoint: {e}")
-                logger.info("🔄 Will start training from scratch")
+                logger.error(f"Failed to load checkpoint: {e}")
+                logger.info("Will start training from scratch")
                 self.start_epoch = 0
                 self.global_step = 0
                 self.best_eval_metric = float('-inf')
         else:
             if hasattr(self.args, 'model_path') and self.args.model_path:
-                logger.warning(f"⚠️ Checkpoint file does not exist: {self.args.model_path}")
-            logger.info("🚀 Starting fresh training")
+                logger.warning(f"Checkpoint file does not exist: {self.args.model_path}")
+            logger.info("Starting fresh training")
     
     def compute_energy_dpo_loss(self, id_smiles=None, ood_smiles=None, batch_data=None):
         """DPO loss computation with support for precomputed features"""
         if batch_data is not None:
-            # 直接传递给模型，模型会自动选择路径
+            # Pass directly to model, model will automatically choose path
             return self.model(batch_data)
         else:
             # Backward compatibility
@@ -241,7 +241,7 @@ class EnergyDPOTrainer:
             filename = 'best_model.pth'
             save_path = os.path.join(self.args.output_dir, filename)
             torch.save(checkpoint, save_path)
-            logger.info(f"✅ Best model saved to {save_path}")
+            logger.info(f"Best model saved to {save_path}")
         
         # Periodically save epoch checkpoints
         if epoch % 5 == 0 or epoch == self.args.epochs - 1:
@@ -273,7 +273,7 @@ class EnergyDPOTrainer:
         data_loader = EnergyDPODataLoader(self.args)
         train_dataloader, eval_dataloader = data_loader.get_dataloaders()
         
-        # Training loop - 🔥 Use self.start_epoch as starting point
+        # Training loop - Use self.start_epoch as starting point
         for epoch in range(self.start_epoch, self.args.epochs):
             self.model.train()
             train_losses = []
@@ -283,7 +283,7 @@ class EnergyDPOTrainer:
             # Set up progress bar
             use_tqdm = os.getenv('TQDM_DISABLE', '0') == '0'
             if use_tqdm:
-                progress_iter = tqdm(train_dataloader, desc=f"🚀 Epoch {epoch+1}/{self.args.epochs}")
+                progress_iter = tqdm(train_dataloader, desc=f"Epoch {epoch+1}/{self.args.epochs}")
             else:
                 progress_iter = train_dataloader
                 total_batches = len(train_dataloader)
@@ -323,12 +323,12 @@ class EnergyDPOTrainer:
                     bar_length = 30
                     filled_length = int(bar_length * (batch_idx + 1) // total_batches)
                     bar = '█' * filled_length + '░' * (bar_length - filled_length)
-                    print(f"\r🚀 Epoch {epoch+1}/{self.args.epochs} |{bar}| {progress:5.1f}% ({batch_idx+1}/{total_batches}) "
+                    print(f"\rEpoch {epoch+1}/{self.args.epochs} |{bar}| {progress:5.1f}% ({batch_idx+1}/{total_batches}) "
                           f"Loss: {loss.item():.4f} E_Sep: {loss_dict['energy_separation']:.4f}", end='')
                 
                 # Periodic evaluation
                 if self.global_step % self.args.eval_steps == 0:
-                    eval_msg = f"🔍 Step {self.global_step} - Starting evaluation..."
+                    eval_msg = f"Step {self.global_step} - Starting evaluation..."
                     if use_tqdm:
                         progress_iter.write(eval_msg)
                     else:
@@ -338,7 +338,7 @@ class EnergyDPOTrainer:
                     eval_loss_dict = self.evaluate(eval_dataloader)
                     
                     result_msg = (
-                        f"✅ Step {self.global_step} - Validation loss: {eval_loss_dict['total_loss']:.4f}, "
+                        f"Step {self.global_step} - Validation loss: {eval_loss_dict['total_loss']:.4f}, "
                         f"Energy separation: {eval_loss_dict['energy_separation']:.4f}, "
                         f"Val-AUROC: {eval_loss_dict['val_auroc']:.4f}"
                     )
@@ -353,7 +353,7 @@ class EnergyDPOTrainer:
                     if current_metric > self.best_eval_metric:
                         self.best_eval_metric = current_metric
                         self.save_checkpoint(epoch, is_best=True)
-                        best_msg = f"🎉 Found better model! Val-AUROC: {current_metric:.4f}"
+                        best_msg = f"Found better model! Val-AUROC: {current_metric:.4f}"
                         if use_tqdm:
                             progress_iter.write(best_msg)
                         else:
@@ -397,7 +397,7 @@ class EnergyDPOTrainer:
                 self.best_eval_metric = current_metric
                 self.save_checkpoint(epoch, is_best=True)
                 self.epochs_no_improve = 0
-                logger.info(f"🎉 Found better model in epoch! Val-AUROC: {current_metric:.4f}")
+                logger.info(f"Found better model in epoch! Val-AUROC: {current_metric:.4f}")
             
             # Save checkpoint for this epoch
             self.save_checkpoint(epoch)
@@ -406,7 +406,7 @@ class EnergyDPOTrainer:
             if current_metric <= self.best_eval_metric + 1e-12:
                 self.epochs_no_improve += 1
             if self.epochs_no_improve >= self.patience:
-                logger.info(f"⏹️ Early stopping triggered: {self.epochs_no_improve} consecutive epochs without improvement (patience={self.patience})")
+                logger.info(f"Early stopping triggered: {self.epochs_no_improve} consecutive epochs without improvement (patience={self.patience})")
                 break
         
         logger.info("Training completed!")

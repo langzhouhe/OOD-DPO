@@ -238,7 +238,7 @@ def unimol_collate_fn(samples, atom_token_mapping=None):
     }
 
 # =============================================================================
-# 原有的数据处理函数
+# Data processing functions
 # =============================================================================
 
 def get_dataset_name_from_file(file_path):
@@ -331,40 +331,40 @@ def _basic_smiles_check(smiles):
 
 def process_drugood_data(data_file, max_samples=None):
     """
-    处理DrugOOD数据集为OOD Detection格式
-    
+    Process DrugOOD dataset for OOD Detection format
+
     Args:
-        data_file: 数据文件路径
-        max_samples: 最大样本数限制
-    
+        data_file: Data file path
+        max_samples: Maximum sample number limit
+
     Returns:
-        dict: 包含训练和验证数据的字典
+        dict: Dictionary containing training and validation data
     """
-    logger.info(f"🎯 OOD Detection模式加载: {data_file}")
+    logger.info(f"OOD Detection mode loading: {data_file}")
     
     with open(data_file, 'r', encoding='utf-8') as f:
         data = json.load(f)
     
     if not isinstance(data, dict) or 'split' not in data:
-        raise ValueError(f"不是有效的DrugOOD格式：缺少'split'键")
+        raise ValueError(f"Not a valid DrugOOD format: missing 'split' key")
     
     split_data = data['split']
     
-    # 按照OOD Detection的正确理念使用DrugOOD数据
-    train_raw = split_data.get('train', [])           # ID训练数据
-    ood_val_raw = split_data.get('ood_val', [])       # OOD训练数据（用于DPO负例）
-    ood_test_raw = split_data.get('ood_test', [])     # OOD测试数据（最终测试用）
-    iid_val_raw = split_data.get('iid_val', [])       # ID验证数据
-    iid_test_raw = split_data.get('iid_test', [])     # ID测试数据（最终测试用）
+    # Use DrugOOD data according to correct OOD Detection principles
+    train_raw = split_data.get('train', [])           # ID training data
+    ood_val_raw = split_data.get('ood_val', [])       # OOD training data (for DPO negative examples)
+    ood_test_raw = split_data.get('ood_test', [])     # OOD test data (for final testing)
+    iid_val_raw = split_data.get('iid_val', [])       # ID validation data
+    iid_test_raw = split_data.get('iid_test', [])     # ID test data (for final testing)
     
-    logger.info(f"📊 OOD Detection原始数据:")
-    logger.info(f"  ID训练(train): {len(train_raw)}")
-    logger.info(f"  ID验证(iid_val): {len(iid_val_raw)}")
-    logger.info(f"  ID测试(iid_test): {len(iid_test_raw)}")
-    logger.info(f"  OOD训练(ood_val): {len(ood_val_raw)}")
-    logger.info(f"  OOD测试(ood_test): {len(ood_test_raw)}")
+    logger.info(f"OOD Detection raw data:")
+    logger.info(f"  ID training(train): {len(train_raw)}")
+    logger.info(f"  ID validation(iid_val): {len(iid_val_raw)}")
+    logger.info(f"  ID test(iid_test): {len(iid_test_raw)}")
+    logger.info(f"  OOD training(ood_val): {len(ood_val_raw)}")
+    logger.info(f"  OOD test(ood_test): {len(ood_test_raw)}")
     
-    # 如果指定了最大样本数，进行采样
+    # If maximum sample number is specified, perform sampling
     if max_samples:
         if len(train_raw) > max_samples:
             train_raw = random.sample(train_raw, max_samples)
@@ -375,7 +375,7 @@ def process_drugood_data(data_file, max_samples=None):
         if len(ood_test_raw) > max_samples:
             ood_test_raw = random.sample(ood_test_raw, max_samples)
     
-    # 处理验证数据
+    # Process validation data
     if iid_val_raw:
         if max_samples and len(iid_val_raw) > max_samples:
             iid_val_raw = random.sample(iid_val_raw, max_samples)
@@ -410,7 +410,7 @@ def process_drugood_data(data_file, max_samples=None):
     test_id_smiles = validate_smiles(test_id_smiles)
     test_ood_smiles = validate_smiles(test_ood_smiles)
     
-    logger.info(f"✅ OOD Detection data processing completed:")
+    logger.info(f"OOD Detection data processing completed:")
     logger.info(f"  Training ID: {len(train_id_smiles)}")
     logger.info(f"  Validation ID: {len(val_id_smiles)}")
     logger.info(f"  Training OOD: {len(train_ood_smiles)}")
@@ -428,16 +428,16 @@ def process_drugood_data(data_file, max_samples=None):
 def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                       data_path='./data', max_samples=None, seed=42,
                       validate_smiles_flag=True):
-    """处理 GOOD 系列分子数据集并返回 SMILES 及其标签
+    """Process GOOD series molecular datasets and return SMILES and their labels
 
     Args:
-        validate_smiles_flag: 是否对提取到的 SMILES 进行 RDKit 校验。对 GOOD 官方预处理产物，建议关闭以提升速度。
+        validate_smiles_flag: Whether to perform RDKit validation on extracted SMILES. For GOOD official preprocessed products, it is recommended to disable this to improve speed.
     """
 
-    logger.info(f"🎯 处理 {dataset_name} 数据集 (domain={domain}, shift={shift})")
+    logger.info(f"Processing {dataset_name} dataset (domain={domain}, shift={shift})")
 
     try:
-        # 动态导入相应的数据集类
+        # Dynamically import corresponding dataset class
         if dataset_name == 'good_hiv':
             from data.good_data.good_datasets.good_hiv import GOODHIV as DatasetClass
         elif dataset_name == 'good_pcba':
@@ -445,29 +445,29 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
         elif dataset_name == 'good_zinc':
             from data.good_data.good_datasets.good_zinc import GOODZINC as DatasetClass
         else:
-            raise ValueError(f"不支持的数据集: {dataset_name}")
+            raise ValueError(f"Unsupported dataset: {dataset_name}")
 
-        logger.info(f"📂 从 {data_path} 加载数据集...")
+        logger.info(f"Loading dataset from {data_path}...")
 
-        # 加载不同的 splits
+        # Load different splits
         train_dataset = DatasetClass(root=data_path, domain=domain, shift=shift, subset='train')
         val_dataset = DatasetClass(root=data_path, domain=domain, shift=shift, subset='val')
         test_dataset = DatasetClass(root=data_path, domain=domain, shift=shift, subset='test')
 
-        # 如果有 shift，也加载 id splits
+        # If there is shift, also load id splits
         if shift != 'no_shift':
             try:
                 id_val_dataset = DatasetClass(root=data_path, domain=domain, shift=shift, subset='id_val')
                 id_test_dataset = DatasetClass(root=data_path, domain=domain, shift=shift, subset='id_test')
             except Exception:
-                logger.warning("无法加载id_val/id_test，将从其他数据中分割")
+                logger.warning("Unable to load id_val/id_test, will split from other data")
                 id_val_dataset = None
                 id_test_dataset = None
         else:
             id_val_dataset = None
             id_test_dataset = None
 
-        # 提取 SMILES 和标签 - 支持多任务学习
+        # Extract SMILES and labels - support multi-task learning
         def extract_smiles_labels(dataset):
             smiles_list, label_list = [], []
             for i in range(len(dataset)):
@@ -478,12 +478,12 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                         if hasattr(data, 'y') and data.y is not None:
                             y = data.y
                             if isinstance(y, torch.Tensor):
-                                # 转换为JSON可序列化的Python原生类型
+                                # Convert to JSON-serializable Python native types
                                 if y.dim() > 1:
-                                    # 多任务情况: [1, num_tasks] -> [num_tasks]，转为list
+                                    # Multi-task case: [1, num_tasks] -> [num_tasks], convert to list
                                     label = y.view(-1).tolist()
                                 else:
-                                    # 单任务情况，转为Python标量或list
+                                    # Single-task case, convert to Python scalar or list
                                     label = y.item() if y.numel() == 1 else y.tolist()
                             else:
                                 label = y
@@ -502,7 +502,7 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
             val_id_smiles, val_id_labels = extract_smiles_labels(id_val_dataset)
             test_id_smiles, test_id_labels = extract_smiles_labels(id_test_dataset)
         else:
-            # 从 train 中分出验证集
+            # Split validation set from train
             if len(train_smiles) > 100:
                 random.seed(seed)
                 val_size = min(len(train_smiles) // 4, 1000)
@@ -542,7 +542,7 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                 val_id_smiles = val_id_smiles[test_size:]
                 val_id_labels = val_id_labels[test_size:] if val_id_labels else [None] * len(val_id_smiles)
 
-        # 将 OOD 数据分成训练和验证两部分
+        # Split OOD data into training and validation parts
         if val_ood_all_smiles:
             random.seed(seed)
             random.shuffle(val_ood_all_smiles)
@@ -554,11 +554,11 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                 val_ood_smiles = train_ood_smiles[-min_val_size:]
                 train_ood_smiles = train_ood_smiles[:-min_val_size]
         else:
-            logger.warning("没有找到OOD验证数据，使用测试数据的一部分")
+            logger.warning("No OOD validation data found, using part of test data")
             if test_ood_smiles:
                 random.seed(seed)
                 random.shuffle(test_ood_smiles)
-                # 三等分：train_ood, val_ood, test_ood (确保无重叠)
+                # Three-way split: train_ood, val_ood, test_ood (ensure no overlap)
                 total_len = len(test_ood_smiles)
                 train_split = total_len // 3
                 val_split = (total_len * 2) // 3
@@ -567,7 +567,7 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                 val_ood_smiles = test_ood_smiles[train_split:val_split]
                 test_ood_smiles = test_ood_smiles[val_split:]
 
-                logger.info(f"OOD数据三等分: train_ood={len(train_ood_smiles)}, val_ood={len(val_ood_smiles)}, test_ood={len(test_ood_smiles)}")
+                logger.info(f"OOD data three-way split: train_ood={len(train_ood_smiles)}, val_ood={len(val_ood_smiles)}, test_ood={len(test_ood_smiles)}")
             else:
                 raise ValueError(
                     f"Dataset {dataset_name} does not contain proper OOD splits. "
@@ -577,7 +577,7 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                     f"Consider using a different domain/shift combination that provides OOD splits."
                 )
 
-        # 如果指定最大样本数，进行采样
+        # If maximum sample number is specified, perform sampling
         if max_samples:
             random.seed(seed)
             if len(train_smiles) > max_samples:
@@ -599,7 +599,7 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
                 if test_id_labels[0] is not None:
                     test_id_labels = test_id_labels[: max_samples]
 
-        # 验证 SMILES（可选）
+        # Validate SMILES (optional)
         if validate_smiles_flag:
             train_smiles = validate_smiles(train_smiles)
             val_id_smiles = validate_smiles(val_id_smiles)
@@ -608,11 +608,11 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
             test_id_smiles = validate_smiles(test_id_smiles)
             test_ood_smiles = validate_smiles(test_ood_smiles)
 
-        logger.info(f"✅ {dataset_name} 数据加载完成:")
-        logger.info(f"  训练ID: {len(train_smiles)}")
+        logger.info(f"{dataset_name} data loading completed:")
+        logger.info(f"  Training ID: {len(train_smiles)}")
         logger.info(f"  Validation ID: {len(val_id_smiles)}")
         logger.info(f"  Training OOD: {len(train_ood_smiles)}")
-        logger.info(f"  验证OOD: {len(val_ood_smiles)}")
+        logger.info(f"  Validation OOD: {len(val_ood_smiles)}")
         logger.info(f"  Test ID: {len(test_id_smiles)}")
         logger.info(f"  Test OOD: {len(test_ood_smiles)}")
 
@@ -629,5 +629,5 @@ def process_good_data(dataset_name, domain='scaffold', shift='covariate',
         }
 
     except Exception as e:
-        logger.error(f"加载 {dataset_name} 失败: {e}")
+        logger.error(f"Loading {dataset_name} failed: {e}")
         raise
