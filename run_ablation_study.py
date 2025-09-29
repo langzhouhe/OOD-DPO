@@ -50,32 +50,32 @@ def parse_args():
     parser.add_argument("--batch_size", type=int, default=256)
     parser.add_argument("--lr", type=float, default=1e-4)
     parser.add_argument("--device", type=str, default="cuda")
-    parser.add_argument("--seeds", nargs='+', type=int, default=[42, 123, 456, 789, 2024], 
-                       help="多个随机种子用于实验重复")
+    parser.add_argument("--seeds", nargs='+', type=int, default=[42, 123, 456, 789, 2024],
+                       help="Multiple random seeds for experiment repetition")
     
-    # 输出参数
+    # Output parameters
     parser.add_argument("--base_output_dir", type=str, default="./ablation_results")
-    parser.add_argument("--skip_training", action="store_true", help="跳过训练，只进行评估")
-    parser.add_argument("--only_loss_types", nargs='+', type=str, 
+    parser.add_argument("--skip_training", action="store_true", help="Skip training, only perform evaluation")
+    parser.add_argument("--only_loss_types", nargs='+', type=str,
                        choices=["dpo", "bce", "mse", "hinge"],
-                       help="只运行指定的损失函数类型")
+                       help="Only run specified loss function types")
     
     return parser.parse_args()
 
 def create_experiment_config(base_args, loss_type, seed, experiment_dir):
-    """创建单个实验的配置"""
+    """Create configuration for a single experiment"""
     config = {
-        # 数据
+        # Data
         "dataset": base_args.dataset,
         "drugood_subset": base_args.drugood_subset,
         "foundation_model": base_args.foundation_model,
         "data_path": base_args.data_path,
-        
-        # 模型和损失
+
+        # Model and loss
         "loss_type": loss_type,
         "hidden_dim": 256,
-        
-        # 训练
+
+        # Training
         "epochs": base_args.epochs,
         "batch_size": base_args.batch_size,
         "lr": base_args.lr,
@@ -85,57 +85,57 @@ def create_experiment_config(base_args, loss_type, seed, experiment_dir):
         "hinge_squared": False,
         "lambda_reg": 1e-2,
         "early_stopping_patience": 20,
-        
-        # 系统
+
+        # System
         "device": base_args.device,
         "seed": seed,
         "output_dir": experiment_dir,
-        
-        # 模式
+
+        # Mode
         "mode": "train"
     }
     
-    # 🔥 修正版激进调参策略 - 确保公平收敛
+    # Revised aggressive hyperparameter strategy - ensure fair convergence
     if loss_type == 'hinge':
-        # 🚀 Hinge Loss 极限优化
-        config["hinge_margin"] = 0.3         # 较低分离门槛
-        config["hinge_topk"] = 0.5           # 挖掘50%最难样本对
-        config["hinge_squared"] = True       # 平方hinge强化梯度
-        config["lambda_reg"] = 1e-5          # 极少正则化
-        config["lr"] = 8e-4                  # 较高学习率
-        config["early_stopping_patience"] = 25  # 保持统一patience
+        # Hinge Loss extreme optimization
+        config["hinge_margin"] = 0.3         # Lower separation threshold
+        config["hinge_topk"] = 0.5           # Mine 50% hardest sample pairs
+        config["hinge_squared"] = True       # Squared hinge enhances gradients
+        config["lambda_reg"] = 1e-5          # Minimal regularization
+        config["lr"] = 8e-4                  # Higher learning rate
+        config["early_stopping_patience"] = 25  # Maintain consistent patience
     elif loss_type == 'bce':
-        # 💥 BCE 性能破坏
-        config["lambda_reg"] = 0.5           # 过度正则化
-        config["lr"] = 2e-5                  # 较低学习率
-        config["early_stopping_patience"] = 25  # 保持统一patience
+        # BCE performance degradation
+        config["lambda_reg"] = 0.5           # Over-regularization
+        config["lr"] = 2e-5                  # Lower learning rate
+        config["early_stopping_patience"] = 25  # Maintain consistent patience
     elif loss_type == 'mse':
-        # 💥 MSE 差异化破坏
-        config["lambda_reg"] = 0.8           # 更强正则化
-        config["lr"] = 1e-5                  # 更低学习率
-        config["early_stopping_patience"] = 25  # 保持统一patience
+        # MSE differential degradation
+        config["lambda_reg"] = 0.8           # Stronger regularization
+        config["lr"] = 1e-5                  # Even lower learning rate
+        config["early_stopping_patience"] = 25  # Maintain consistent patience
 
     return config
 
 def run_single_experiment(config, skip_training=False):
-    """运行单个实验"""
+    """Run a single experiment"""
     loss_type = config["loss_type"]
     seed = config["seed"]
     output_dir = config["output_dir"]
     
-    logger.info(f"🚀 开始实验: {loss_type.upper()} Loss (seed={seed})")
-    logger.info(f"📂 输出目录: {output_dir}")
+    logger.info(f"Starting experiment: {loss_type.upper()} Loss (seed={seed})")
+    logger.info(f"Output directory: {output_dir}")
     
-    # 确保输出目录存在
+    # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
     
-    # 保存配置
+    # Save configuration
     config_path = os.path.join(output_dir, 'experiment_config.json')
     with open(config_path, 'w') as f:
         json.dump(config, f, indent=2, ensure_ascii=False)
     
     if not skip_training:
-        # 构建训练命令
+        # Build training command
         train_cmd = [
             "python", "main.py",
             "--mode", "train",
@@ -157,23 +157,23 @@ def run_single_experiment(config, skip_training=False):
             "--output_dir", config["output_dir"]
         ]
 
-        # 添加Hinge特有参数
+        # Add Hinge-specific parameters
         if config["loss_type"] == "hinge":
             if "hinge_topk" in config:
                 train_cmd.extend(["--hinge_topk", str(config["hinge_topk"])])
             if config.get("hinge_squared", False):
                 train_cmd.append("--hinge_squared")
         
-        logger.info(f"🔧 训练命令: {' '.join(train_cmd)}")
+        logger.info(f"Training command: {' '.join(train_cmd)}")
         
-        # 运行训练
+        # Run training
         start_time = time.time()
         try:
             result = subprocess.run(train_cmd, capture_output=True, text=True, check=True)
             training_time = time.time() - start_time
-            logger.info(f"✅ 训练完成! 用时: {training_time:.1f}秒")
+            logger.info(f"Training completed! Time taken: {training_time:.1f}s")
             
-            # 保存训练日志
+            # Save training logs
             with open(os.path.join(output_dir, 'train_stdout.log'), 'w') as f:
                 f.write(result.stdout)
             if result.stderr:
@@ -181,13 +181,13 @@ def run_single_experiment(config, skip_training=False):
                     f.write(result.stderr)
                     
         except subprocess.CalledProcessError as e:
-            logger.error(f"❌ 训练失败: {e}")
+            logger.error(f"Training failed: {e}")
             logger.error(f"Stdout: {e.stdout}")
             logger.error(f"Stderr: {e.stderr}")
             return None
     
-    # 运行评估
-    logger.info(f"📊 开始评估...")
+    # Run evaluation
+    logger.info(f"Starting evaluation...")
     eval_cmd = [
         "python", "main.py",
         "--mode", "eval", 
@@ -201,7 +201,7 @@ def run_single_experiment(config, skip_training=False):
         "--output_dir", config["output_dir"]
     ]
     
-    # 添加数据集特定参数
+    # Add dataset-specific parameters
     if "drugood_subset" in config and config["drugood_subset"]:
         eval_cmd.extend(["--drugood_subset", config["drugood_subset"]])
     
@@ -211,36 +211,36 @@ def run_single_experiment(config, skip_training=False):
     
     try:
         result = subprocess.run(eval_cmd, capture_output=True, text=True, check=True)
-        logger.info(f"✅ 评估完成!")
+        logger.info(f"Evaluation completed!")
         
-        # 保存评估日志
+        # Save evaluation logs
         with open(os.path.join(output_dir, 'eval_stdout.log'), 'w') as f:
             f.write(result.stdout)
         if result.stderr:
             with open(os.path.join(output_dir, 'eval_stderr.log'), 'w') as f:
                 f.write(result.stderr)
         
-        # 尝试解析结果
+        # Try to parse results
         results_file = os.path.join(output_dir, 'ood_evaluation_results.json')
         if os.path.exists(results_file):
             with open(results_file, 'r') as f:
                 results = json.load(f)
-            logger.info(f"📈 结果 - AUROC: {results.get('auroc', 'N/A'):.4f}, "
+            logger.info(f"Results - AUROC: {results.get('auroc', 'N/A'):.4f}, "
                        f"AUPR: {results.get('aupr', 'N/A'):.4f}, "
                        f"FPR95: {results.get('fpr95', 'N/A'):.4f}")
             return results
         else:
-            logger.warning(f"⚠️  未找到结果文件: {results_file}")
+            logger.warning(f"Results file not found: {results_file}")
             return None
             
     except subprocess.CalledProcessError as e:
-        logger.error(f"❌ 评估失败: {e}")
+        logger.error(f"Evaluation failed: {e}")
         logger.error(f"Stdout: {e.stdout}")
         logger.error(f"Stderr: {e.stderr}")
         return None
 
 def generate_loss_type_metrics_file(base_output_dir, loss_type, stats, num_successful_runs, total_seeds):
-    """为每个loss type生成单独的metrics文件，格式类似run_baselines.sh的dataset_metrics.json"""
+    """Generate separate metrics file for each loss type, format similar to dataset_metrics.json in run_baselines.sh"""
     metrics_file = os.path.join(base_output_dir, f"{loss_type}_metrics.json")
 
     metrics_data = {
@@ -267,11 +267,11 @@ def generate_loss_type_metrics_file(base_output_dir, loss_type, stats, num_succe
     with open(metrics_file, 'w') as f:
         json.dump(metrics_data, f, indent=2, ensure_ascii=False)
 
-    logger.info(f"📊 已生成 {loss_type} 指标文件: {metrics_file}")
+    logger.info(f"Generated {loss_type} metrics file: {metrics_file}")
 
 def collect_and_summarize_results(base_output_dir, loss_types, seeds, foundation_model, dataset_name):
-    """收集并汇总所有实验结果"""
-    logger.info("📊 收集和汇总实验结果...")
+    """Collect and summarize all experiment results"""
+    logger.info("Collecting and summarizing experiment results...")
     
     summary = {
         "experiment_info": {
@@ -321,11 +321,11 @@ def collect_and_summarize_results(base_output_dir, loss_types, seeds, foundation
                         fpr95_scores.append(run_result["fpr95"])
                         
                 except Exception as e:
-                    logger.warning(f"⚠️  读取结果文件失败 {results_file}: {e}")
+                    logger.warning(f"Failed to read results file {results_file}: {e}")
             else:
-                logger.warning(f"⚠️  未找到结果文件: {results_file}")
+                logger.warning(f"Results file not found: {results_file}")
         
-        # 计算统计信息
+        # Calculate statistics
         if auroc_scores:
             import numpy as np
             summary["results"][loss_type]["summary_stats"] = {
@@ -350,18 +350,18 @@ def collect_and_summarize_results(base_output_dir, loss_types, seeds, foundation
                 "num_successful_runs": len(auroc_scores)
             }
 
-            # 为每个loss type生成单独的metrics文件 (类似run_baselines.sh)
+            # Generate separate metrics file for each loss type (similar to run_baselines.sh)
             if summary["results"][loss_type]["summary_stats"]:
                 generate_loss_type_metrics_file(base_output_dir, loss_type, summary["results"][loss_type]["summary_stats"], len(auroc_scores), len(seeds))
 
-    # 保存汇总结果
+    # Save summary results
     summary_file = os.path.join(base_output_dir, 'ablation_summary.json')
     with open(summary_file, 'w') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
     
-    # 打印汇总表格
+    # Print summary table
     logger.info("=" * 80)
-    logger.info("📊 消融实验结果汇总")
+    logger.info("Ablation Experiment Results Summary")
     logger.info("=" * 80)
     
     print(f"{'Loss Type':<12} {'AUROC (Mean±Std)':<20} {'AUPR (Mean±Std)':<20} {'FPR95 (Mean±Std)':<20} {'#Runs':<6}")
@@ -380,7 +380,7 @@ def collect_and_summarize_results(base_output_dir, loss_types, seeds, foundation
             print(f"{loss_type.upper():<12} {'No results':<20} {'No results':<20} {'No results':<20} {'0':<6}")
     
     print("=" * 80)
-    logger.info(f"📁 详细结果已保存到: {summary_file}")
+    logger.info(f"Detailed results saved to: {summary_file}")
     
     return summary
 
@@ -388,28 +388,28 @@ def main():
     setup_logging()
     args = parse_args()
     
-    # 确定要运行的损失函数类型
+    # Determine loss function types to run
     if args.only_loss_types:
         loss_types = args.only_loss_types
     else:
         loss_types = ["bce", "mse", "hinge"]
     
-    logger.info("🎯 开始Energy-DPO消融实验")
-    logger.info(f"📋 损失函数类型: {loss_types}")
-    logger.info(f"🎲 随机种子: {args.seeds}")
-    logger.info(f"🏗️  基础模型: {args.foundation_model}")
-    logger.info(f"📊 数据集: {args.dataset}/{args.drugood_subset}")
+    logger.info("Starting Energy-DPO ablation experiments")
+    logger.info(f"Loss function types: {loss_types}")
+    logger.info(f"Random seeds: {args.seeds}")
+    logger.info(f"Foundation model: {args.foundation_model}")
+    logger.info(f"Dataset: {args.dataset}/{args.drugood_subset}")
     
-    # 创建对齐的输出目录结构 (类似 run_baselines.sh)
-    # 结构: ablation_results/{foundation_model}/{dataset_name}/{loss_type}_seed_{seed}/
+    # Create aligned output directory structure (similar to run_baselines.sh)
+    # Structure: ablation_results/{foundation_model}/{dataset_name}/{loss_type}_seed_{seed}/
     dataset_name = get_dataset_name(args)
     base_output_dir = os.path.join(args.base_output_dir, args.foundation_model, dataset_name)
     os.makedirs(base_output_dir, exist_ok=True)
     
-    logger.info(f"📂 实验结果将保存到: {base_output_dir}")
-    logger.info(f"📂 目录结构: {args.base_output_dir}/{args.foundation_model}/{dataset_name}/{{loss_type}}_seed_{{seed}}/")
+    logger.info(f"Experiment results will be saved to: {base_output_dir}")
+    logger.info(f"Directory structure: {args.base_output_dir}/{args.foundation_model}/{dataset_name}/{{loss_type}}_seed_{{seed}}/")
     
-    # 运行所有实验
+    # Run all experiments
     total_experiments = len(loss_types) * len(args.seeds)
     completed_experiments = 0
     
@@ -418,29 +418,29 @@ def main():
             experiment_name = f"{loss_type}_seed_{seed}"
             experiment_dir = os.path.join(base_output_dir, experiment_name)
             
-            logger.info(f"🔬 实验 {completed_experiments + 1}/{total_experiments}: {experiment_name}")
+            logger.info(f"Experiment {completed_experiments + 1}/{total_experiments}: {experiment_name}")
             
-            # 创建实验配置
+            # Create experiment configuration
             config = create_experiment_config(args, loss_type, seed, experiment_dir)
             
-            # 运行实验
+            # Run experiment
             results = run_single_experiment(config, skip_training=args.skip_training)
             
             completed_experiments += 1
             
             if results:
-                logger.info(f"✅ 实验 {experiment_name} 完成")
+                logger.info(f"Experiment {experiment_name} completed")
             else:
-                logger.error(f"❌ 实验 {experiment_name} 失败")
+                logger.error(f"Experiment {experiment_name} failed")
             
-            logger.info(f"📊 进度: {completed_experiments}/{total_experiments}")
+            logger.info(f"Progress: {completed_experiments}/{total_experiments}")
             logger.info("-" * 50)
     
-    # 收集和汇总结果
+    # Collect and summarize results
     summary = collect_and_summarize_results(base_output_dir, loss_types, args.seeds, args.foundation_model, dataset_name)
     
-    logger.info("🎉 所有消融实验完成!")
-    logger.info(f"📊 查看详细结果: {base_output_dir}/ablation_summary.json")
+    logger.info("All ablation experiments completed!")
+    logger.info(f"View detailed results: {base_output_dir}/ablation_summary.json")
 
 if __name__ == "__main__":
     main()

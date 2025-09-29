@@ -48,7 +48,7 @@ def load_model_predictions():
     return results
 
 def create_combined_violin_plot(results, output_path):
-    """创建组合小提琴图显示ID vs OOD分数分布"""
+    """Create combined violin plot showing ID vs OOD score distribution"""
     fig, axes = plt.subplots(1, 3, figsize=(15, 5))
 
     method_names = {'hinge': 'Hinge Loss', 'bce': 'BCE Loss', 'mse': 'MSE Loss'}
@@ -60,7 +60,7 @@ def create_combined_violin_plot(results, output_path):
         id_scores = np.array(data['id_scores'])
         ood_scores = np.array(data['ood_scores'])
 
-        # 准备数据用于小提琴图
+        # Prepare data for violin plot
         scores_data = []
         labels_data = []
 
@@ -75,11 +75,11 @@ def create_combined_violin_plot(results, output_path):
             'Type': labels_data
         })
 
-        # 创建小提琴图
+        # Create violin plot
         parts = ax.violinplot([id_scores, ood_scores], positions=[0, 1],
                              showmeans=True, showmedians=True, widths=0.7)
 
-        # 设置颜色
+        # Set colors
         for pc in parts['bodies']:
             pc.set_facecolor(colors[method])
             pc.set_alpha(0.7)
@@ -91,7 +91,7 @@ def create_combined_violin_plot(results, output_path):
         if i == 0:
             ax.set_ylabel('Energy Score')
 
-        # 计算分离度
+        # Calculate separation
         separation = np.mean(ood_scores) - np.mean(id_scores)
         ax.text(0.5, 0.95, f'Sep: {separation:.3f}',
                transform=ax.transAxes, ha='center', va='top',
@@ -114,9 +114,9 @@ def main():
         # Generate combined violin plot
         violin_path = os.path.join('comparison_plots', 'combined_violin_plot.svg')
         create_combined_violin_plot(results, violin_path)
-        print("✅ Violin plot regenerated successfully!")
+        print("Violin plot regenerated successfully!")
     else:
-        print(f"❌ Could only load {len(results)} methods, need 3")
+        print(f"Could only load {len(results)} methods, need 3")
 
 if __name__ == "__main__":
     main()

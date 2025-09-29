@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-生成单独的EC50难对验证图表 - 每个分析一张图
-同时输出PNG和SVG格式
+Generate individual EC50 hard pairs validation charts - one chart per analysis
+Output both PNG and SVG formats
 """
 
 import os
@@ -17,12 +17,12 @@ import torch
 import torch.nn.functional as F
 from scipy.special import expit as sigmoid
 
-# 导入项目模块
+# Import project modules
 sys.path.append('/home/ubuntu/OOD-DPO')
 from model import EnergyDPOModel
 from data_loader import EnergyDPODataLoader
 
-# 设置专业绘图风格
+# Set professional plotting style
 plt.style.use('default')
 matplotlib.rcParams['font.family'] = 'Times New Roman'
 matplotlib.rcParams['font.size'] = 16
@@ -30,19 +30,19 @@ matplotlib.rcParams['axes.linewidth'] = 1.2
 matplotlib.rcParams['axes.spines.right'] = False
 matplotlib.rcParams['axes.spines.top'] = False
 
-# 数据集颜色配置（参考beta plots）
+# Dataset color configuration (reference beta plots)
 DATASET_COLORS = {
-    'lbap_general_ec50_assay': '#2E86AB',      # 明亮的蓝色
-    'lbap_general_ec50_scaffold': '#F24236',   # 明亮的红色
-    'lbap_general_ec50_size': '#2E8B57'        # 绿色
+    'lbap_general_ec50_assay': '#2E86AB',      # Bright blue
+    'lbap_general_ec50_scaffold': '#F24236',   # Bright red
+    'lbap_general_ec50_size': '#2E8B57'        # Green
 }
 
-# 配置日志
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 def setup_device():
-    """设置计算设备"""
+    """Setup computing device"""
     if torch.cuda.is_available():
         device = torch.device('cuda')
         logger.info(f"Using GPU: {torch.cuda.get_device_name()}")
@@ -52,7 +52,7 @@ def setup_device():
     return device
 
 class IndividualHardPairsValidator:
-    """生成单独图表的EC50难对验证分析器"""
+    """EC50 hard pairs validation analyzer for generating individual charts"""
 
     def __init__(self, device):
         self.device = device
@@ -60,8 +60,8 @@ class IndividualHardPairsValidator:
         self.data_path = './data/raw'
 
     def load_model_and_data(self, dataset_name, seed=1):
-        """加载模型和数据"""
-        # 加载模型
+        """Load model and data"""
+        # Load model
         model_path = f"{self.base_model_path}/{dataset_name}/{seed}/best_model.pth"
 
         if not os.path.exists(model_path):
@@ -69,7 +69,7 @@ class IndividualHardPairsValidator:
 
         logger.info(f"Loading model from {model_path}")
 
-        # 创建args对象以初始化模型
+        # Create args object to initialize model
         class Args:
             def __init__(self):
                 self.foundation_model = 'minimol'
@@ -79,7 +79,7 @@ class IndividualHardPairsValidator:
         args = Args()
         model = EnergyDPOModel(args)
 
-        # 加载模型状态
+        # Load model state
         checkpoint = torch.load(model_path, map_location=self.device)
         if 'model_state_dict' in checkpoint:
             model.load_state_dict(checkpoint['model_state_dict'])
@@ -89,7 +89,7 @@ class IndividualHardPairsValidator:
         model = model.to(self.device)
         model.eval()
 
-        # 提取实际的beta值
+        # Extract actual beta value
         if hasattr(model, 'beta'):
             if torch.is_tensor(model.beta):
                 actual_beta = float(model.beta.cpu().detach().numpy())
@@ -99,7 +99,7 @@ class IndividualHardPairsValidator:
             actual_beta = 0.1
         logger.info(f"Extracted actual beta value: {actual_beta}")
 
-        # 加载数据
+        # Load data
         class DataArgs:
             def __init__(self, data_path):
                 self.dataset = dataset_name
@@ -116,19 +116,19 @@ class IndividualHardPairsValidator:
         return model, actual_beta, test_id, test_ood
 
     def compute_analysis_data(self, model, actual_beta, test_id, test_ood, max_samples=500):
-        """计算分析所需的数据"""
+        """Compute data required for analysis"""
         if max_samples:
             n_samples = min(max_samples, len(test_id), len(test_ood))
             test_id = test_id[:n_samples]
             test_ood = test_ood[:n_samples]
 
-        # 计算能量
+        # Compute energies
         batch_size = 100
         all_energy_id = []
         all_energy_ood = []
 
         with torch.no_grad():
-            # 计算ID能量
+            # Compute ID energies
             for i in tqdm(range(0, len(test_id), batch_size), desc="Computing ID energies"):
                 batch_id = test_id[i:i+batch_size]
                 if isinstance(batch_id[0], dict):
@@ -138,7 +138,7 @@ class IndividualHardPairsValidator:
                 energy_id = model.forward_energy(features_id).cpu().numpy()
                 all_energy_id.extend(energy_id)
 
-            # 计算OOD能量
+            # Compute OOD energies
             for i in tqdm(range(0, len(test_ood), batch_size), desc="Computing OOD energies"):
                 batch_ood = test_ood[i:i+batch_size]
                 if isinstance(batch_ood[0], dict):
@@ -151,7 +151,7 @@ class IndividualHardPairsValidator:
         all_energy_id = np.array(all_energy_id)
         all_energy_ood = np.array(all_energy_ood)
 
-        # 生成pairs
+        # Generate pairs
         max_pairs = min(50000, len(all_energy_id) * len(all_energy_ood))
         id_indices = np.random.choice(len(all_energy_id), size=max_pairs, replace=True)
         ood_indices = np.random.choice(len(all_energy_ood), size=max_pairs, replace=True)
@@ -159,11 +159,11 @@ class IndividualHardPairsValidator:
         energy_id_pairs = all_energy_id[id_indices]
         energy_ood_pairs = all_energy_ood[ood_indices]
 
-        # 计算能量差和梯度权重
+        # Compute energy differences and gradient weights
         delta_values = energy_ood_pairs - energy_id_pairs
         weights = actual_beta * sigmoid(-actual_beta * delta_values)
 
-        # 创建分箱分析
+        # Create binning analysis
         n_bins = 20
         valid_mask = np.isfinite(delta_values) & np.isfinite(weights)
         delta_clean = delta_values[valid_mask]
@@ -203,14 +203,14 @@ class IndividualHardPairsValidator:
         }
 
 def save_both_formats(fig, filepath_base):
-    """保存PNG和SVG格式"""
+    """Save PNG and SVG formats"""
     plt.savefig(f"{filepath_base}.png", format='png', bbox_inches='tight', dpi=300, facecolor='white')
     plt.savefig(f"{filepath_base}.svg", format='svg', bbox_inches='tight', facecolor='white')
     plt.close()
-    logger.info(f"✅ Saved both formats: {filepath_base}.png/.svg")
+    logger.info(f"Saved both formats: {filepath_base}.png/.svg")
 
 def create_individual_plots(dataset_name, analysis_data, output_dir):
-    """创建4个单独的图表"""
+    """Create 4 individual charts"""
     os.makedirs(output_dir, exist_ok=True)
 
     primary_color = DATASET_COLORS.get(dataset_name, '#F24236')
@@ -225,15 +225,15 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
     easy_pairs_mask = delta_values > 0
     boundary_mask = np.abs(delta_values) < 0.05
 
-    # 图1: 核心验证图 - 经验vs理论曲线
+    # Chart 1: Core validation chart - empirical vs theoretical curves
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
 
-    # 采样数据点
+    # Sample data points
     sample_idx = np.random.choice(len(delta_values), size=min(3000, len(delta_values)), replace=False)
     ax.scatter(delta_values[sample_idx], weights[sample_idx],
                alpha=0.3, s=2, color='lightgray', label='Individual pairs', zorder=1)
 
-    # 经验曲线
+    # Empirical curve
     valid_bins = ~np.isnan(binned_data['mean_weights'])
     ax.errorbar(binned_data['bin_centers'][valid_bins],
                 binned_data['mean_weights'][valid_bins],
@@ -241,7 +241,7 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
                 fmt='o-', color=primary_color, markersize=8, linewidth=3, capsize=5,
                 label='Empirical curve', zorder=3)
 
-    # 理论曲线
+    # Theoretical curve
     t_theory = np.linspace(delta_values.min(), delta_values.max(), 1000)
     w_theory = actual_beta * sigmoid(-actual_beta * t_theory)
     ax.plot(t_theory, w_theory, '--', color='black', linewidth=3,
@@ -258,7 +258,7 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
 
     save_both_formats(fig, f"{output_dir}/figure_a3_1_core_validation_{dataset_name}")
 
-    # 图2: 权重对比柱状图
+    # Chart 2: Weight comparison bar chart
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
 
     categories = ['Hard Pairs\n(ΔE<0)', 'Easy Pairs\n(ΔE>0)', 'Boundary\n(|ΔE|<0.05)']
@@ -285,13 +285,13 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
 
     save_both_formats(fig, f"{output_dir}/figure_a3_2_weight_comparison_{dataset_name}")
 
-    # 图3: 权重分布直方图
+    # Chart 3: Weight distribution histogram
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
 
     ax.hist(weights, bins=50, alpha=0.7, density=True, color=primary_color,
             edgecolor='black', linewidth=0.5, label='All pairs')
 
-    # 添加均值线
+    # Add mean lines
     ax.axvline(x=weights.mean(), color='black', linestyle='--', linewidth=2,
                label=f'Overall mean: {weights.mean():.4f}')
 
@@ -312,7 +312,7 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
 
     save_both_formats(fig, f"{output_dir}/figure_a3_3_weight_distribution_{dataset_name}")
 
-    # 图4: 能量差分布图
+    # Chart 4: Energy difference distribution
     fig, ax = plt.subplots(1, 1, figsize=(10, 7))
 
     ax.hist(delta_values, bins=50, alpha=0.6, color='lightsteelblue',
@@ -322,7 +322,7 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
     ax.axvline(x=delta_values.mean(), color='blue', linestyle='--', linewidth=2,
                label=f'Mean ΔE: {delta_values.mean():.2f}')
 
-    # 填充区域
+    # Fill areas
     ylim = ax.get_ylim()
     if hard_pairs_mask.any():
         ax.fill_between([delta_values.min(), 0], 0, ylim[1], alpha=0.2, color='red',
@@ -341,26 +341,26 @@ def create_individual_plots(dataset_name, analysis_data, output_dir):
 
     save_both_formats(fig, f"{output_dir}/figure_a3_4_energy_distribution_{dataset_name}")
 
-    logger.info(f"✅ All 4 individual plots created for {dataset_name}")
+    logger.info(f"All 4 individual plots created for {dataset_name}")
 
 def main():
-    parser = argparse.ArgumentParser(description='生成单独的EC50难对验证图表')
+    parser = argparse.ArgumentParser(description='Generate individual EC50 hard pairs validation charts')
     parser.add_argument('--datasets', nargs='+',
                        default=['lbap_general_ec50_scaffold', 'lbap_general_ec50_size', 'lbap_general_ec50_assay'],
-                       help='要分析的数据集')
+                       help='Datasets to analyze')
     parser.add_argument('--seeds', nargs='+', type=int, default=[1],
-                       help='要分析的随机种子')
+                       help='Random seeds to analyze')
     parser.add_argument('--max_samples', type=int, default=500,
-                       help='每个数据集最大样本数')
+                       help='Maximum number of samples per dataset')
     parser.add_argument('--output_dir', type=str, default='individual_hard_pairs_plots',
-                       help='输出目录')
+                       help='Output directory')
 
     args = parser.parse_args()
 
-    # 设置设备
+    # Setup device
     device = setup_device()
 
-    # 初始化分析器
+    # Initialize analyzer
     validator = IndividualHardPairsValidator(device)
 
     for dataset_name in args.datasets:
@@ -370,22 +370,22 @@ def main():
                 logger.info(f"Processing {dataset_name} with seed {seed}")
                 logger.info(f"{'='*60}")
 
-                # 加载模型和数据
+                # Load model and data
                 model, actual_beta, test_id, test_ood = validator.load_model_and_data(dataset_name, seed)
 
-                # 计算分析数据
+                # Compute analysis data
                 analysis_data = validator.compute_analysis_data(model, actual_beta, test_id, test_ood, args.max_samples)
 
-                # 创建单独图表
+                # Create individual charts
                 create_individual_plots(dataset_name, analysis_data, args.output_dir)
 
-                print(f"\n✅ {dataset_name} 分析完成！生成了4个单独图表（PNG + SVG）")
+                print(f"\n{dataset_name} analysis completed! Generated 4 individual charts (PNG + SVG)")
 
             except Exception as e:
                 logger.error(f"Failed to process {dataset_name} seed {seed}: {e}")
                 continue
 
-    logger.info(f"\n🎉 所有分析完成！图表保存至: {args.output_dir}")
+    logger.info(f"\nAll analysis completed! Charts saved to: {args.output_dir}")
 
 if __name__ == '__main__':
     main()

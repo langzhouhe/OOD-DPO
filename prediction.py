@@ -71,7 +71,7 @@ class EnergyDPOPredictor:
         scores = self.predict_batch(smiles_list, batch_size)
         
         if self.threshold is None:
-            logger.warning("未设置阈值，只返回分数")
+            logger.warning("Threshold not set, only returning scores")
             return scores, None
         
         predictions = (scores > self.threshold).astype(int)
@@ -86,56 +86,56 @@ class EnergyDPOPredictor:
             output_file: Output CSV file path
             smiles_column: SMILES column name
         """
-        # 加载数据
+        # Load data
         df = pd.read_csv(input_file)
         
         if smiles_column not in df.columns:
-            raise ValueError(f"列 '{smiles_column}' 在 {input_file} 中未找到")
+            raise ValueError(f"Column '{smiles_column}' not found in {input_file}")
         
         smiles_list = df[smiles_column].tolist()
-        logger.info(f"从 {input_file} 加载了 {len(smiles_list)} 个分子")
+        logger.info(f"Loaded {len(smiles_list)} molecules from {input_file}")
         
-        # 做预测
+        # Make predictions
         scores = self.predict_batch(smiles_list)
         
-        # 将结果添加到数据框
+        # Add results to dataframe
         df['energy_score'] = scores
         
         if self.threshold is not None:
             df['ood_prediction'] = (scores > self.threshold).astype(int)
-            df['ood_probability'] = 1 / (1 + np.exp(-scores))  # Sigmoid变换
+            df['ood_probability'] = 1 / (1 + np.exp(-scores))  # Sigmoid transformation
         
-        # 保存结果
+        # Save results
         if output_file:
             df.to_csv(output_file, index=False)
-            logger.info(f"结果已保存到 {output_file}")
+            logger.info(f"Results saved to {output_file}")
         
         return df
     
     def set_threshold(self, threshold):
-        """设置OOD检测阈值"""
+        """Set OOD detection threshold"""
         self.threshold = threshold
-        logger.info(f"阈值设置为 {threshold}")
+        logger.info(f"Threshold set to {threshold}")
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Energy-DPO Prediction')
     
-    # 模型
+    # Model
     parser.add_argument("--model_path", type=str, required=True)
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--dpo_beta", type=float, default=0.1)
-    
-    # 输入/输出
-    parser.add_argument("--input_file", type=str, help="包含SMILES的输入CSV文件")
-    parser.add_argument("--output_file", type=str, help="输出CSV文件")
-    parser.add_argument("--smiles_column", type=str, default="smiles", help="SMILES列名")
-    parser.add_argument("--smiles", type=str, nargs='+', help="要预测的SMILES字符串")
-    
-    # 预测
-    parser.add_argument("--threshold", type=float, help="OOD检测阈值")
+
+    # Input/Output
+    parser.add_argument("--input_file", type=str, help="Input CSV file containing SMILES")
+    parser.add_argument("--output_file", type=str, help="Output CSV file")
+    parser.add_argument("--smiles_column", type=str, default="smiles", help="SMILES column name")
+    parser.add_argument("--smiles", type=str, nargs='+', help="SMILES strings to predict")
+
+    # Prediction
+    parser.add_argument("--threshold", type=float, help="OOD detection threshold")
     parser.add_argument("--batch_size", type=int, default=64)
-    
-    # 其他
+
+    # Others
     parser.add_argument("--device", type=str, default="cuda")
     parser.add_argument("--seed", type=int, default=42)
     
@@ -146,11 +146,11 @@ def main():
     
     args = parse_args()
     
-    # 创建预测器
+    # Create predictor
     predictor = EnergyDPOPredictor(args.model_path, args, args.threshold)
-    
+
     if args.input_file:
-        # 从文件预测
+        # Predict from file
         results_df = predictor.predict_from_file(
             args.input_file, 
             args.output_file, 

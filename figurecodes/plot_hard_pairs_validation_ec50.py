@@ -173,20 +173,20 @@ def plot_hard_pairs_validation(results_dict, dataset_name, output_dir="./compari
     ax1.scatter(delta_values[::10], weights[::10], alpha=0.1, s=1, color='lightblue',
                 label='Individual pairs')
 
-    # Plot binned averages - 经验曲线用鲜明的红色
+    # Plot binned averages - empirical curve in bright red
     valid_bins = ~np.isnan(binned_data['mean_weights'])
     ax1.errorbar(binned_data['bin_centers'][valid_bins],
                  binned_data['mean_weights'][valid_bins],
                  yerr=binned_data['std_weights'][valid_bins] / np.sqrt(binned_data['counts'][valid_bins]),
                  fmt='o-', color='crimson', markersize=6, linewidth=3, capsize=4,
-                 label='经验曲线 (分箱平均值)')
+                 label='Empirical curve (binned averages)')
 
-    # Theoretical curve: w_β(t) = β·σ(-β·t) - 使用对比鲜明的颜色
+    # Theoretical curve: w_β(t) = β·σ(-β·t) - use contrasting bright color
     t_theory = np.linspace(delta_values.min(), delta_values.max(), 1000)
     w_theory = beta * sigmoid(-beta * t_theory)
-    ax1.plot(t_theory, w_theory, '--', color='navy', linewidth=4, label=f'理论曲线: β·σ(-β·t), β={beta:.1f}')
+    ax1.plot(t_theory, w_theory, '--', color='navy', linewidth=4, label=f'Theoretical curve: β·σ(-β·t), β={beta:.1f}')
 
-    ax1.axvline(x=0, color='orange', linestyle=':', linewidth=2, alpha=0.8, label='决策边界 (ΔE = 0)')
+    ax1.axvline(x=0, color='orange', linestyle=':', linewidth=2, alpha=0.8, label='Decision boundary (ΔE = 0)')
     ax1.set_xlabel('能量差 ΔE = E_ood - E_id\n(负值=难对, 正值=易对)', fontsize=12)
     ax1.set_ylabel('梯度权重 w_β(ΔE)', fontsize=12)
     ax1.set_title(f'难对验证: {dataset_name.replace("_", " ").title()}\n经验曲线对齐理论预测 w_β(t)=β·σ(-βt)', fontsize=11)
@@ -295,14 +295,14 @@ def create_detailed_analysis_visualization(results_dict, dataset_name, output_di
     ax1.axvline(x=0, color='orange', linestyle=':', linewidth=3, alpha=0.8, label='决策边界')
     ax1.set_xlabel('能量差 ΔE = E_ood - E_id', fontsize=12, fontweight='bold')
     ax1.set_ylabel('梯度权重 w_β(ΔE)', fontsize=12, fontweight='bold')
-    ax1.set_title('核心验证: 经验曲线vs理论预测\n单调递减，零点附近最高', fontsize=11)
+    ax1.set_title('Core validation: Empirical curve vs theoretical prediction\nMonotonically decreasing, highest near zero', fontsize=11)
     ax1.legend(fontsize=10)
     ax1.grid(True, alpha=0.3)
 
-    # 子图2: 难对vs易对权重对比
+    # Subplot 2: Hard vs easy pairs weight comparison
     ax2 = axes[0, 1]
 
-    categories = ['难对\n(ΔE<0)', '易对\n(ΔE>0)', '边界对\n(|ΔE|<0.05)']
+    categories = ['Hard pairs\n(ΔE<0)', 'Easy pairs\n(ΔE>0)', 'Boundary pairs\n(|ΔE|<0.05)']
     mean_weights = [
         weights[hard_pairs_mask].mean(),
         weights[easy_pairs_mask].mean(),
@@ -372,7 +372,7 @@ def create_detailed_analysis_visualization(results_dict, dataset_name, output_di
     return fig
 
 def print_validation_analysis(results_dict, dataset_name):
-    """打印详细的验证分析结果"""
+    """Print detailed validation analysis results"""
 
     delta_values = results_dict['delta_values']
     weights = results_dict['weights']
@@ -383,39 +383,39 @@ def print_validation_analysis(results_dict, dataset_name):
     boundary_mask = np.abs(delta_values) < 0.05
 
     print("\n" + "="*60)
-    print(f"📊 {dataset_name} 难对验证分析结果")
+    print(f"{dataset_name} Hard Pairs Validation Analysis Results")
     print("="*60)
 
-    print(f"\n🎯 理论验证指标:")
-    print(f"   理论公式: w_β(t) = β·σ(-βt), β = {beta:.1f}")
-    print(f"   验证要点: 经验曲线应单调递减，零点附近权重最高")
+    print(f"\nTheoretical Validation Metrics:")
+    print(f"   Theoretical formula: w_β(t) = β·σ(-βt), β = {beta:.1f}")
+    print(f"   Validation point: Empirical curve should be monotonically decreasing, highest weights near zero")
 
-    print(f"\n📈 能量差分布:")
-    print(f"   总样本对数: {len(delta_values):,}")
-    print(f"   平均能量差: {delta_values.mean():.3f}")
-    print(f"   标准差: {delta_values.std():.3f}")
+    print(f"\nEnergy Difference Distribution:")
+    print(f"   Total sample pairs: {len(delta_values):,}")
+    print(f"   Average energy difference: {delta_values.mean():.3f}")
+    print(f"   Standard deviation: {delta_values.std():.3f}")
 
-    print(f"\n⚖️ 难易对分类:")
-    print(f"   难对比例 (ΔE<0): {hard_pairs_mask.mean():.1%} ({hard_pairs_mask.sum():,}对)")
-    print(f"   易对比例 (ΔE>0): {easy_pairs_mask.mean():.1%} ({easy_pairs_mask.sum():,}对)")
-    print(f"   边界对比例 (|ΔE|<0.05): {boundary_mask.mean():.1%} ({boundary_mask.sum():,}对)")
+    print(f"\nHard vs Easy Pair Classification:")
+    print(f"   Hard pair ratio (ΔE<0): {hard_pairs_mask.mean():.1%} ({hard_pairs_mask.sum():,} pairs)")
+    print(f"   Easy pair ratio (ΔE>0): {easy_pairs_mask.mean():.1%} ({easy_pairs_mask.sum():,} pairs)")
+    print(f"   Boundary pair ratio (|ΔE|<0.05): {boundary_mask.mean():.1%} ({boundary_mask.sum():,} pairs)")
 
-    print(f"\n🎯 梯度权重分析:")
+    print(f"\nGradient Weight Analysis:")
     hard_weight = weights[hard_pairs_mask].mean()
     easy_weight = weights[easy_pairs_mask].mean()
     boundary_weight = weights[boundary_mask].mean() if boundary_mask.any() else 0
 
-    print(f"   难对平均权重: {hard_weight:.5f}")
-    print(f"   易对平均权重: {easy_weight:.5f}")
-    print(f"   边界对平均权重: {boundary_weight:.5f}")
-    print(f"   难对权重优势: {((hard_weight/easy_weight-1)*100):+.1f}%")
+    print(f"   Hard pairs average weight: {hard_weight:.5f}")
+    print(f"   Easy pairs average weight: {easy_weight:.5f}")
+    print(f"   Boundary pairs average weight: {boundary_weight:.5f}")
+    print(f"   Hard pairs weight advantage: {((hard_weight/easy_weight-1)*100):+.1f}%")
 
-    print(f"\n✅ 理论验证结果:")
+    print(f"\nTheoretical Validation Results:")
     zero_weight = weights[np.abs(delta_values) < 0.01].mean()
-    print(f"   零点附近权重: {zero_weight:.5f}")
-    print(f"   权重单调性: {'✓ 通过' if hard_weight > easy_weight else '✗ 未通过'}")
-    print(f"   零点最高性: {'✓ 通过' if zero_weight >= hard_weight else '✗ 未通过'}")
-    print(f"   理论对齐性: {'✓ 经验曲线与理论预测高度一致' if hard_weight > easy_weight else '✗ 存在偏差'}")
+    print(f"   Zero-point nearby weight: {zero_weight:.5f}")
+    print(f"   Weight monotonicity: {'Passed' if hard_weight > easy_weight else 'Failed'}")
+    print(f"   Zero-point maximum: {'Passed' if zero_weight >= hard_weight else 'Failed'}")
+    print(f"   Theoretical alignment: {'Empirical curve highly consistent with theoretical prediction' if hard_weight > easy_weight else 'Deviation exists'}")
 
 def main():
     parser = argparse.ArgumentParser(description='EC50 Hard Pairs Validation Analysis')
@@ -517,10 +517,10 @@ def main():
             # Plot results
             plot_hard_pairs_validation(aggregated_results, dataset_name, args.output_dir)
 
-            # 创建详细分析可视化
+            # Create detailed analysis visualization
             create_detailed_analysis_visualization(aggregated_results, dataset_name, args.output_dir)
 
-            # 打印详细分析结果
+            # Print detailed analysis results
             print_validation_analysis(aggregated_results, dataset_name)
 
             all_results[dataset_name] = aggregated_results
