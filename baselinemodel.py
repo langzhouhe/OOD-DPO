@@ -101,7 +101,10 @@ class BaselineOODModel(nn.Module):
         # Feature normalization stats for distance/density methods
         self._feat_mean = None
         self._feat_std = None
-        
+
+        # For Conformal Prediction method
+        self.calibration_scores = None
+
         # Set model to evaluation mode
         self.model.eval()
     
@@ -138,6 +141,13 @@ class BaselineOODModel(nn.Module):
             # Get n_neighbors from args, default to 20
             n_neighbors = getattr(self.args, 'lof_neighbors', 20) if self.args else 20
             return self._lof_score(features, n_neighbors=n_neighbors)
+        elif self.method_name == 'mc_dropout':
+            # Get MC Dropout parameters from args
+            n_samples = getattr(self.args, 'mc_dropout_samples', 20) if self.args else 20
+            metric = getattr(self.args, 'mc_dropout_metric', 'entropy') if self.args else 'entropy'
+            return self._mc_dropout_score(features, n_samples=n_samples, metric=metric)
+        elif self.method_name == 'conformal':
+            return self._conformal_score(features)
         else:
             raise ValueError(f"Unknown baseline method: {self.method_name}")
     
@@ -692,3 +702,207 @@ class BaselineOODModel(nn.Module):
             f"Stored {len(self.train_features)} training feature vectors of dimension {self.train_features.shape[1]} "
             f"(features standardized)"
         )
+
+    def _mc_dropout_score(self, features, n_samples=20, metric='entropy'):
+        """Monte Carlo Dropout-based OOD detection.
+
+        Uses dropout at test time to estimate predictive uncertainty.
+        Higher uncertainty indicates more likely OOD.
+
+        Args:
+            features: Input feature tensor [batch_size, input_dim]
+            n_samples: Number of forward passes with dropout (default: 20)
+            metric: Uncertainty metric - 'entropy' or 'variance' (default: 'entropy')
+
+        Returns:
+            scores: OOD scores [batch_size] (higher = more uncertain = more OOD)
+        """
+        # Store original model state
+        original_mode = self.model.training
+
+        # IMPORTANT: Keep model in eval mode (so BatchNorm uses fixed stats)
+        # but enable ONLY Dropout layers for MC sampling
+        self.model.eval()
+
+        # Enable dropout layers while keeping other layers (BatchNorm, etc.) in eval mode
+        def enable_dropout(m):
+            if isinstance(m, nn.Dropout):
+                m.train()
+
+        self.model.apply(enable_dropout)
+
+        predictions = []
+        output_dim = None  # Will store the output dimension for task type detection
+
+        # Multiple forward passes with dropout enabled
+        with torch.no_grad():
+            for i in range(n_samples):
+                logits = self.model(features)
+
+                # Save output dimension on first iteration
+                if i == 0:
+                    output_dim = logits.shape[1]
+
+                # Convert logits to probabilities based on task type
+                if output_dim > 2:  # Multi-task case (Sigmoid)
+                    probs = torch.sigmoid(logits)
+                elif output_dim == 1:  # Binary with single output
+                    probs = torch.sigmoid(logits)
+                    probs = torch.cat([1 - probs, probs], dim=1)  # [batch_size, 2]
+                else:  # Multi-class with softmax (including binary classification)
+                    probs = F.softmax(logits, dim=1)
+
+                predictions.append(probs)
+
+        # Restore original model state
+        self.model.train(original_mode)
+
+        # Stack predictions: [n_samples, batch_size, num_classes]
+        predictions = torch.stack(predictions)
+
+        # Compute uncertainty based on metric
+        if metric == 'entropy':
+            # Predictive entropy: entropy of the mean prediction
+            mean_probs = predictions.mean(dim=0)  # [batch_size, num_classes/num_tasks]
+            epsilon = 1e-10  # For numerical stability
+
+            # Compute entropy based on task type
+            if output_dim > 2:  # Multi-task with Sigmoid
+                # Binary entropy for each task: H(p) = -[p*log(p) + (1-p)*log(1-p)]
+                binary_entropy = -(mean_probs * torch.log(mean_probs + epsilon) +
+                                  (1 - mean_probs) * torch.log(1 - mean_probs + epsilon))
+                # Average entropy across all tasks
+                entropy = binary_entropy.mean(dim=1)
+            else:  # Single-task or binary classification with Softmax
+                # Standard entropy: H(p) = -Σ p*log(p)
+                entropy = -(mean_probs * torch.log(mean_probs + epsilon)).sum(dim=1)
+
+            ood_scores = entropy
+
+        elif metric == 'variance':
+            # Variance of predictions across samples
+            # Use variance of max probabilities
+            max_probs = predictions.max(dim=2)[0]  # [n_samples, batch_size]
+            variance = max_probs.var(dim=0)  # [batch_size]
+
+            ood_scores = variance
+
+        else:
+            raise ValueError(f"Unknown MC Dropout metric: {metric}")
+
+        return ood_scores
+
+    def fit_conformal_calibration(self, dataloader, device):
+        """Compute calibration scores for Conformal Prediction method.
+
+        Uses validation/calibration data (ID only) to establish the distribution
+        of conformity scores (max_prob) under the in-distribution.
+
+        Args:
+            dataloader: Calibration data loader (ID samples only)
+            device: torch device
+        """
+        logger.info("Computing conformal calibration scores...")
+
+        all_scores = []
+        self.model.eval()
+
+        with torch.no_grad():
+            for batch in tqdm(dataloader, desc="Calibration"):
+                if isinstance(batch, dict):
+                    features = batch['features'].to(device)
+                else:
+                    features = batch[0].to(device)
+
+                logits = self.model(features)
+
+                # Compute conformity scores: max_prob (higher = more confident = more conformal)
+                if logits.shape[1] > 2:  # Multi-task case
+                    # Use sigmoid for multi-task
+                    sigmoid_probs = torch.sigmoid(logits)
+                    # For each task, get max of (prob, 1-prob), then average
+                    max_probs_per_task = torch.maximum(sigmoid_probs, 1 - sigmoid_probs)
+                    max_probs = max_probs_per_task.mean(dim=1)
+                elif logits.shape[1] == 1:
+                    # Binary with single output
+                    sigmoid_probs = torch.sigmoid(logits).squeeze()
+                    max_probs = torch.maximum(sigmoid_probs, 1 - sigmoid_probs)
+                else:
+                    # Multi-class with softmax
+                    probs = F.softmax(logits, dim=1)
+                    max_probs = probs.max(dim=1)[0]
+
+                # Store conformity scores directly (higher confidence = more conformal)
+                conformity_scores = max_probs
+                all_scores.append(conformity_scores.cpu())
+
+        # Concatenate all calibration scores
+        self.calibration_scores = torch.cat(all_scores)
+
+        logger.info(
+            f"Calibration complete: {len(self.calibration_scores)} samples, "
+            f"mean conformity = {self.calibration_scores.mean():.4f}"
+        )
+
+    def _conformal_score(self, features):
+        """Conformal Prediction-based OOD detection.
+
+        Computes p-values for test samples based on calibration distribution.
+        Lower p-value (less conformal) indicates more likely OOD.
+
+        Args:
+            features: Input feature tensor [batch_size, input_dim]
+
+        Returns:
+            scores: OOD scores [batch_size] (higher = less conformal = more OOD)
+        """
+        if self.calibration_scores is None:
+            raise ValueError(
+                "Conformal method requires calibration scores. "
+                "Call fit_conformal_calibration() first."
+            )
+
+        with torch.no_grad():
+            logits = self.model(features)
+
+            # Compute conformity scores for test samples (same as calibration)
+            if logits.shape[1] > 2:  # Multi-task case
+                sigmoid_probs = torch.sigmoid(logits)
+                max_probs_per_task = torch.maximum(sigmoid_probs, 1 - sigmoid_probs)
+                max_probs = max_probs_per_task.mean(dim=1)
+            elif logits.shape[1] == 1:
+                # Binary with single output
+                sigmoid_probs = torch.sigmoid(logits).squeeze()
+                max_probs = torch.maximum(sigmoid_probs, 1 - sigmoid_probs)
+            else:
+                # Multi-class with softmax
+                probs = F.softmax(logits, dim=1)
+                max_probs = probs.max(dim=1)[0]
+
+            # Conformity scores for test samples (higher = more confident)
+            test_conformity = max_probs
+
+            # Compute p-values
+            batch_size = features.size(0)
+            p_values = torch.zeros(batch_size)
+
+            # Move calibration scores to same device as test scores
+            calib_scores = self.calibration_scores.to(test_conformity.device)
+            n_calib = len(calib_scores)
+
+            for i in range(batch_size):
+                # Count how many calibration scores are <= test score
+                # (lower calibration conformity = test sample is more conformal than calibration)
+                n_less_equal = (calib_scores <= test_conformity[i]).sum().item()
+
+                # Compute conformal p-value
+                # High p-value means test sample is as conformal as calibration (likely ID)
+                # Low p-value means test sample is less conformal (likely OOD)
+                p_values[i] = (1 + n_less_equal) / (1 + n_calib)
+
+            # OOD score: 1 - p_value
+            # High p-value (very conformal/confident) → low OOD score (likely ID)
+            # Low p-value (not conformal/uncertain) → high OOD score (likely OOD)
+            ood_scores = 1.0 - p_values
+
+        return ood_scores

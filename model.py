@@ -126,7 +126,10 @@ def _initialize_unimol():
             else:
                 logger.warning(f"Pretrained weights not found: {pretrained_path}")
             
-            logger.info("UniMol model initialization complete")
+            # Move to GPU if available for much faster feature encoding
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            _unimol_instance = _unimol_instance.to(device)
+            logger.info(f"UniMol model initialization complete on {device}")
             
         except Exception as e:
             logger.error(f"UniMol initialization failed: {e}")
@@ -143,6 +146,13 @@ def _initialize_minimol():
             logger.info("Loading Minimol model...")
             # Correct initialization based on actual Minimol API
             _minimol_instance = Minimol()  # Default batch_size=100
+
+            # NOTE: Minimol runs on CPU by design
+            # The graphium-based Fingerprinter has data preprocessing steps that require CPU
+            # Moving it to GPU causes device mismatch errors in the data pipeline
+            # This is expected behavior - Minimol encoding happens on CPU
+            logger.info("Minimol uses CPU for encoding (by design)")
+
             logger.info("Minimol model loaded successfully")
         except Exception as e:
             logger.error(f"Minimol loading failed: {e}")
@@ -244,6 +254,10 @@ class UniMolEncoder:
             # SMILES to graph data
             graph_samples = []
             for smiles in smiles_list:
+                if isinstance(smiles, dict):
+                    # Precomputed graph (cached ahead of time)
+                    graph_samples.append(smiles)
+                    continue
                 try:
                     graph_data = smiles2graph(smiles)
                     graph_samples.append(graph_data)
@@ -399,6 +413,379 @@ class UniMolEncoder:
             'edge_types': batch_edge_type
         }
 
+
+class FinetunableUniMolEncoder(nn.Module):
+    """
+    Uni-Mol encoder with trainable parameters for partial finetuning.
+    Unlike UniMolEncoder which uses frozen weights, this class allows
+    gradient backpropagation for specified layers.
+    """
+    def __init__(self, freeze_layers='0-12'):
+        super().__init__()
+
+        # Create a fresh UniMol instance (bypass singleton)
+        self.model, self.dictionary = self._initialize_unimol_fresh()
+        self.atom_token_mapping = self._create_token_mapping()
+
+        # Configure layer freezing
+        self._configure_layer_freezing(freeze_layers)
+
+        logger.info(f"FinetunableUniMolEncoder initialized with freeze_layers='{freeze_layers}'")
+
+    def _initialize_unimol_fresh(self):
+        """Create a fresh UniMol instance without using the global singleton"""
+        try:
+            from unicore.data import Dictionary
+            from unimol.models import UniMolModel
+            import argparse
+
+            logger.info("Creating fresh UniMol instance for finetuning...")
+
+            # Load or create dictionary (same as _initialize_unimol)
+            dict_path = "./weights/dict.txt"
+            dictionary = None
+
+            if os.path.exists(dict_path):
+                try:
+                    dictionary = Dictionary.load(dict_path)
+                    logger.info(f"Dictionary loaded from {dict_path}")
+                except Exception:
+                    dictionary = None
+
+            if dictionary is None:
+                logger.info("Creating new Dictionary for finetunable encoder")
+                dictionary = Dictionary()
+
+                # Add special tokens
+                dictionary.add_symbol('[PAD]', is_special=True)
+                dictionary.add_symbol('[UNK]', is_special=True)
+                dictionary.add_symbol('[CLS]', is_special=True)
+                dictionary.add_symbol('[SEP]', is_special=True)
+                dictionary.add_symbol('[MASK]', is_special=True)
+
+                # Add common atom symbols
+                common_atoms = [
+                    'H', 'C', 'N', 'O', 'F', 'S', 'Cl', 'Br', 'I',
+                    'P', 'B', 'Si', 'Na', 'Mg', 'K', 'Ca',
+                    'Fe', 'Zn', 'Cu', 'Mn', 'Al', 'Ag', 'Au', 'Pt',
+                    'As', 'Se', 'Sn'
+                ]
+
+                for symbol in common_atoms[:26]:  # Total 31 tokens
+                    dictionary.add_symbol(symbol)
+
+            # Create model with same configuration as frozen version
+            args = argparse.Namespace()
+            args.arch = 'unimol_base'
+            args.encoder_layers = 15
+            args.encoder_attention_heads = 64
+            args.encoder_embed_dim = 512
+            args.encoder_ffn_embed_dim = 2048
+            args.dropout = 0.1
+            args.attention_dropout = 0.1
+            args.activation_dropout = 0.0
+            args.pooler_dropout = 0.0
+            args.max_seq_len = 512
+            args.post_ln = False
+            args.mode = 'infer'
+            args.remove_hydrogen = False
+            args.no_token_positional_embeddings = False
+            args.encoder_normalize_before = True
+            args.masked_token_loss = -1.0
+            args.masked_coord_loss = -1.0
+            args.masked_dist_loss = -1.0
+            args.x_norm_loss = -1.0
+            args.delta_pair_repr_norm_loss = -1.0
+            args.activation_fn = 'gelu'
+            args.pooler_activation_fn = 'tanh'
+            args.emb_dropout = 0.1
+
+            model = UniMolModel(args, dictionary)
+
+            # Load pretrained weights
+            pretrained_path = "./weights/mol_pre_no_h_220816.pt"
+            if os.path.exists(pretrained_path):
+                try:
+                    logger.info("Loading pretrained weights for finetunable encoder...")
+                    checkpoint = torch.load(pretrained_path, map_location='cpu', weights_only=False)
+
+                    model_state_dict = model.state_dict()
+                    pretrained_state_dict = checkpoint['model']
+
+                    filtered_state_dict = {}
+                    for name, param in pretrained_state_dict.items():
+                        if name in model_state_dict and param.shape == model_state_dict[name].shape:
+                            filtered_state_dict[name] = param
+
+                    model.load_state_dict(filtered_state_dict, strict=False)
+                    logger.info(f"Loaded {len(filtered_state_dict)} pretrained parameters")
+
+                except Exception as e:
+                    logger.warning(f"Failed to load pretrained weights: {e}")
+            else:
+                logger.warning(f"Pretrained weights not found: {pretrained_path}")
+
+            return model, dictionary
+
+        except Exception as e:
+            logger.error(f"Failed to create finetunable UniMol encoder: {e}")
+            raise
+
+    def _create_token_mapping(self):
+        """Create token mapping (same as UniMolEncoder)"""
+        token_mapping = {}
+
+        # Special tokens
+        try:
+            token_mapping['[PAD]'] = self.dictionary.pad()
+            token_mapping['[UNK]'] = self.dictionary.unk()
+            token_mapping['[CLS]'] = getattr(self.dictionary, 'bos', lambda: 2)()
+            token_mapping['[SEP]'] = getattr(self.dictionary, 'eos', lambda: 3)()
+            token_mapping['[MASK]'] = 4
+        except Exception:
+            token_mapping.update({'[PAD]': 0, '[UNK]': 1, '[CLS]': 2, '[SEP]': 3, '[MASK]': 4})
+
+        # Compatibility mappings
+        token_mapping.update({
+            '<pad>': token_mapping['[PAD]'],
+            '<unk>': token_mapping['[UNK]'],
+            '<s>': token_mapping['[CLS]'],
+            '</s>': token_mapping['[SEP]'],
+            '<mask>': token_mapping['[MASK]']
+        })
+
+        # Atom symbols
+        if hasattr(self.dictionary, 'symbols'):
+            for i, symbol in enumerate(self.dictionary.symbols):
+                if symbol not in token_mapping:
+                    token_mapping[symbol] = i
+        else:
+            # Fallback atom mapping
+            atom_symbols = ['H', 'C', 'N', 'O', 'F', 'S', 'Cl', 'Br', 'I', 'P']
+            for i, symbol in enumerate(atom_symbols, 5):
+                token_mapping[symbol] = i
+
+        return token_mapping
+
+    def _configure_layer_freezing(self, freeze_layers):
+        """
+        Freeze specific layers based on configuration string.
+
+        Args:
+            freeze_layers: str or list, e.g., '0-12' or ['embeddings', 'layers.0', 'layers.1']
+        """
+        if freeze_layers is None:
+            # Don't freeze anything
+            logger.info("No layers frozen - full finetuning enabled")
+            return
+
+        # Parse freeze configuration
+        if isinstance(freeze_layers, str):
+            if '-' in freeze_layers:
+                # Range format: '0-12' means freeze layers 0 to 12
+                start, end = map(int, freeze_layers.split('-'))
+                freeze_patterns = [f'encoder.layers.{i}' for i in range(start, end + 1)]
+            else:
+                freeze_patterns = [freeze_layers]
+        else:
+            freeze_patterns = freeze_layers
+
+        # Count frozen and trainable parameters
+        total_params = 0
+        frozen_params = 0
+        trainable_params = 0
+
+        for name, param in self.model.named_parameters():
+            total_params += param.numel()
+
+            # Check if this parameter should be frozen
+            should_freeze = any(pattern in name for pattern in freeze_patterns)
+
+            if should_freeze:
+                param.requires_grad = False
+                frozen_params += param.numel()
+            else:
+                param.requires_grad = True
+                trainable_params += param.numel()
+
+        logger.info(f"Layer freezing configured:")
+        logger.info(f"  Total parameters: {total_params:,}")
+        logger.info(f"  Frozen parameters: {frozen_params:,} ({100*frozen_params/total_params:.1f}%)")
+        logger.info(f"  Trainable parameters: {trainable_params:,} ({100*trainable_params/total_params:.1f}%)")
+
+    def encode_smiles(self, smiles_list):
+        """
+        Encode SMILES list using UniMol pipeline (with gradient support).
+
+        NOTE: Unlike UniMolEncoder, this method does NOT use torch.no_grad(),
+        allowing gradients to flow for finetuning.
+        """
+        if not smiles_list:
+            return torch.empty(0, 512)
+
+        try:
+            # SMILES to graph data (same as UniMolEncoder)
+            graph_samples = []
+            for smiles in smiles_list:
+                if isinstance(smiles, dict):
+                    # Precomputed graph cached ahead of time
+                    graph_samples.append(smiles)
+                    continue
+                try:
+                    graph_data = smiles2graph(smiles)
+                    graph_samples.append(graph_data)
+                except Exception:
+                    # Minimal placeholder
+                    graph_samples.append({
+                        'atoms': ['C'],
+                        'coordinates': np.array([[0.0, 0.0, 0.0]], dtype=np.float32),
+                        'distance_matrix': np.array([[0.0]], dtype=np.float32),
+                        'edge_types': np.array([[0]], dtype=np.int64),
+                        'mol': None,
+                        'smiles': smiles
+                    })
+
+            # Batch collation
+            try:
+                batch_data = unimol_collate_fn(graph_samples, self.atom_token_mapping)
+            except Exception:
+                batch_data = self._fallback_collate_fn(graph_samples)
+
+            # Handle nested data structure
+            if isinstance(batch_data, dict):
+                if 'net_input' in batch_data:
+                    actual_data = batch_data['net_input']
+                elif 'batched_data' in batch_data:
+                    actual_data = batch_data['batched_data']
+                else:
+                    actual_data = batch_data
+
+                # Standardize keys
+                key_mappings = {
+                    'src_tokens': 'tokens',
+                    'src_coord': 'coordinates',
+                    'src_distance': 'distance_matrix',
+                    'src_edge_type': 'edge_types'
+                }
+
+                standardized_data = {}
+                for old_key, new_key in key_mappings.items():
+                    if old_key in actual_data:
+                        standardized_data[new_key] = actual_data[old_key]
+
+                batch_data = standardized_data if standardized_data else self._fallback_collate_fn(graph_samples)
+
+            # Move to device
+            device = next(self.model.parameters()).device
+            for key in ['tokens', 'coordinates', 'distance_matrix', 'edge_types']:
+                if key in batch_data and isinstance(batch_data[key], torch.Tensor):
+                    batch_data[key] = batch_data[key].to(device)
+
+            # UniMol forward pass - KEY DIFFERENCE: NO torch.no_grad()
+            # Gradients can flow when self.training is True
+            try:
+                model_output = self.model.forward(
+                    src_tokens=batch_data['tokens'],
+                    src_coord=batch_data['coordinates'],
+                    src_distance=batch_data['distance_matrix'],
+                    src_edge_type=batch_data['edge_types'],
+                    features_only=True
+                )
+
+                if isinstance(model_output, tuple):
+                    encoder_out = model_output[0]
+                elif isinstance(model_output, dict) and 'encoder_out' in model_output:
+                    encoder_out = model_output['encoder_out']
+                else:
+                    encoder_out = model_output
+
+            except Exception:
+                # Simplified fallback
+                encoder_out = self.model(
+                    batch_data['tokens'],
+                    batch_data['distance_matrix'],
+                    batch_data['coordinates'],
+                    batch_data['edge_types']
+                )
+                if isinstance(encoder_out, tuple):
+                    encoder_out = encoder_out[0]
+
+            # Extract molecular features from [CLS] token
+            if isinstance(encoder_out, torch.Tensor):
+                molecule_features = encoder_out[:, 0, :]
+            elif isinstance(encoder_out, tuple):
+                molecule_features = encoder_out[0][:, 0, :]
+            elif isinstance(encoder_out, dict):
+                key = 'last_hidden_state' if 'last_hidden_state' in encoder_out else list(encoder_out.keys())[0]
+                molecule_features = encoder_out[key][:, 0, :]
+            else:
+                raise ValueError(f"Unsupported model output type: {type(encoder_out)}")
+
+            # Project to 512 dimensions if needed
+            if molecule_features.size(-1) != 512:
+                if not hasattr(self, 'projection'):
+                    self.projection = nn.Linear(molecule_features.size(-1), 512).to(device)
+                molecule_features = self.projection(molecule_features)
+
+            return molecule_features
+
+        except Exception as e:
+            failed_smiles = smiles_list if len(smiles_list) <= 3 else f"{smiles_list[:3]}... (total {len(smiles_list)})"
+            logger.error(f"FinetunableUniMol encoding failed: {e}")
+            raise UniMolEncodingError(failed_smiles, e)
+
+    def _fallback_collate_fn(self, samples):
+        """Fallback batch collation function (same as UniMolEncoder)"""
+        batch_size = len(samples)
+        if batch_size == 0:
+            return {}
+
+        max_atoms = max(len(sample['atoms']) for sample in samples)
+        max_atoms = max(max_atoms, 1)
+
+        batch_tokens = torch.zeros(batch_size, max_atoms + 2, dtype=torch.long)
+        batch_coordinates = torch.zeros(batch_size, max_atoms + 2, 3, dtype=torch.float32)
+        batch_distance = torch.zeros(batch_size, max_atoms + 2, max_atoms + 2, dtype=torch.float32)
+        batch_edge_type = torch.zeros(batch_size, max_atoms + 2, max_atoms + 2, dtype=torch.long)
+
+        for i, sample in enumerate(samples):
+            atoms = sample['atoms']
+            coordinates = sample['coordinates']
+            distance_matrix = sample['distance_matrix']
+            edge_types = sample['edge_types']
+
+            num_atoms = len(atoms)
+
+            # Set tokens (CLS + atoms + SEP)
+            batch_tokens[i, 0] = self.atom_token_mapping.get('[CLS]', 2)
+            for j, atom in enumerate(atoms):
+                batch_tokens[i, j + 1] = self.atom_token_mapping.get(atom, self.atom_token_mapping.get('[UNK]', 1))
+            if num_atoms + 1 < max_atoms + 2:
+                batch_tokens[i, num_atoms + 1] = self.atom_token_mapping.get('[SEP]', 3)
+
+            # Set coordinates
+            batch_coordinates[i, 0] = torch.zeros(3)  # CLS
+            batch_coordinates[i, 1:num_atoms + 1] = torch.from_numpy(coordinates)
+            if num_atoms + 1 < max_atoms + 2:
+                batch_coordinates[i, num_atoms + 1] = torch.zeros(3)  # SEP
+
+            # Set distance matrix and edge types
+            ext_distance_matrix = torch.zeros(max_atoms + 2, max_atoms + 2)
+            ext_distance_matrix[1:num_atoms + 1, 1:num_atoms + 1] = torch.from_numpy(distance_matrix)
+            batch_distance[i] = ext_distance_matrix
+
+            ext_edge_types = torch.zeros(max_atoms + 2, max_atoms + 2, dtype=torch.long)
+            ext_edge_types[1:num_atoms + 1, 1:num_atoms + 1] = torch.from_numpy(edge_types)
+            batch_edge_type[i] = ext_edge_types
+
+        return {
+            'tokens': batch_tokens,
+            'coordinates': batch_coordinates,
+            'distance_matrix': batch_distance,
+            'edge_types': batch_edge_type
+        }
+
+
 class EnergyHead(nn.Module):
     def __init__(self, input_dim=512, hidden_dim=256):
         super().__init__()
@@ -424,17 +811,24 @@ class EnergyDPOModel(nn.Module):
         self.beta = getattr(args, 'dpo_beta', 0.1)
         self.lambda_reg = getattr(args, 'lambda_reg', 0.01)  # L2 regularization strength
         self.foundation_model = getattr(args, 'foundation_model', 'minimol')
-        
+        self.finetune_encoder = getattr(args, 'finetune_encoder', False)
+
         logger.info(f"Initializing EnergyDPOModel (using {self.foundation_model})")
-        
-        # Select encoder
-        if self.foundation_model == 'minimol':
+
+        # Select encoder - with optional finetuning support
+        if self.finetune_encoder and self.foundation_model == 'unimol':
+            # Use finetunable encoder for Uni-Mol
+            freeze_layers = getattr(args, 'freeze_layers', '0-12')
+            logger.info(f"Using FINETUNABLE UniMol encoder (freeze_layers='{freeze_layers}')")
+            self.encoder = FinetunableUniMolEncoder(freeze_layers=freeze_layers)
+        elif self.foundation_model == 'minimol':
             self.encoder = MinimolEncoder()
         elif self.foundation_model == 'unimol':
+            # Use frozen encoder (default behavior)
             self.encoder = UniMolEncoder()
         else:
             raise ValueError(f"Unsupported foundation_model: {self.foundation_model}")
-        
+
         # Energy head
         self.energy_head = EnergyHead(
             input_dim=self.embedding_dim,
@@ -506,6 +900,11 @@ class EnergyDPOModel(nn.Module):
                 batch_data['id_features'], 
                 batch_data['ood_features']
             )
+        elif 'id_graphs' in batch_data and 'ood_graphs' in batch_data:
+            # Graphs are precomputed (no RDKit inside the training loop)
+            id_features = self.encoder.encode_smiles(batch_data['id_graphs'])
+            ood_features = self.encoder.encode_smiles(batch_data['ood_graphs'])
+            loss, loss_dict = self.compute_energy_dpo_loss_from_features(id_features, ood_features)
         else:
             # Fallback to SMILES encoding
             id_smiles = batch_data['id_smiles']

@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 from datetime import datetime
 import warnings
-import concurrent.futures as cf
 
 import numpy as np
 import torch
@@ -17,22 +16,10 @@ warnings.filterwarnings("ignore", message="Failed to find the pandas get_adjustm
 warnings.filterwarnings("ignore", message="Failed to patch pandas.*")
 
 # Import utility functions from utils.py
-from utils import process_drugood_data, process_good_data, smiles2graph
+from utils import process_drugood_data, process_good_data
 
 # Set up a logger for this module.
 logger = logging.getLogger(__name__)
-
-
-def _smiles_to_graph_safe(smiles):
-    """Helper for parallel graph caching (must be top-level to be picklable)."""
-    try:
-        graph = smiles2graph(smiles)
-        # Drop rdkit mol object to keep cache picklable/lightweight
-        if isinstance(graph, dict) and 'mol' in graph:
-            graph = {k: v for k, v in graph.items() if k != 'mol'}
-        return smiles, graph, None
-    except Exception as e:
-        return smiles, None, str(e)
 
 
 class EnergyDPODataset(Dataset):
@@ -100,56 +87,12 @@ class PrecomputedEnergyDPODataset(Dataset):
             'ood_smiles': self.ood_smiles_list[ood_idx],
         }
 
-class GraphCachedEnergyDPODataset(Dataset):
-    """Dataset that serves precomputed Uni-Mol graph inputs (avoids per-batch RDKit/3D work)."""
-
-    def __init__(self, id_smiles_list, ood_smiles_list, graph_cache, mode='train', seed=None):
-        self.id_smiles_list = id_smiles_list
-        self.ood_smiles_list = ood_smiles_list
-        self.graph_cache = graph_cache
-        self.mode = mode
-        self.length = min(len(self.id_smiles_list), len(self.ood_smiles_list))
-        self.rng = random.Random(seed)
-        logger.info(
-            f"GraphCached Dataset ({mode}): ID={len(id_smiles_list)}, OOD={len(ood_smiles_list)}, effective length={self.length}"
-        )
-
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, idx):
-        if self.mode == 'train':
-            ood_idx = self.rng.randint(0, len(self.ood_smiles_list) - 1)
-            id_idx = self.rng.randint(0, len(self.id_smiles_list) - 1)
-        else:
-            ood_idx = idx % len(self.ood_smiles_list)
-            id_idx = idx % len(self.id_smiles_list)
-
-        id_smiles = self.id_smiles_list[id_idx]
-        ood_smiles = self.ood_smiles_list[ood_idx]
-
-        return {
-            'id_graph': self.graph_cache[id_smiles],
-            'ood_graph': self.graph_cache[ood_smiles],
-            'id_smiles': id_smiles,
-            'ood_smiles': ood_smiles,
-        }
-
 
 def energy_dpo_collate_fn(batch):
     """Collates a batch of SMILES strings."""
     return {
         'ood_smiles': [item['ood_smiles'] for item in batch],
         'id_smiles': [item['id_smiles'] for item in batch],
-    }
-
-def graph_cached_energy_dpo_collate_fn(batch):
-    """Collates a batch of precomputed Uni-Mol graph dicts."""
-    return {
-        'id_graphs': [item['id_graph'] for item in batch],
-        'ood_graphs': [item['ood_graph'] for item in batch],
-        'id_smiles': [item['id_smiles'] for item in batch],
-        'ood_smiles': [item['ood_smiles'] for item in batch],
     }
 
 
@@ -188,6 +131,10 @@ class EnergyDPODataLoader:
         self.good_domain = getattr(args, 'good_domain', 'scaffold')
         self.good_shift = getattr(args, 'good_shift', 'covariate')
 
+        # Test dataset configuration (for cross-dataset evaluation)
+        self.test_data_file = getattr(args, 'test_data_file', None)
+        self.test_drugood_subset = getattr(args, 'test_drugood_subset', None)
+
         # Control seeds and sampling
         self.data_seed = getattr(args, 'data_seed', 42)
         self.max_samples = getattr(args, 'debug_dataset_size', None)
@@ -197,13 +144,6 @@ class EnergyDPODataLoader:
         self.cache_dir = Path(getattr(args, 'cache_root', '/home/ubuntu/projects')) / 'ood_dpo_cache'
         self.force_recompute = getattr(args, 'force_recompute_cache', False)
         self.encoding_batch_size = getattr(args, 'encoding_batch_size', 128)
-        self.graph_cache_workers = max(
-            1,
-            min(
-                getattr(args, 'graph_cache_workers', 16),
-                os.cpu_count() or 8
-            )
-        )
         # Optional external cache overrides
         self.external_feature_cache_file = Path(getattr(args, 'feature_cache_file', '')) if getattr(args, 'feature_cache_file', None) else None
         self.external_splits_cache_file = Path(getattr(args, 'splits_cache_file', '')) if getattr(args, 'splits_cache_file', None) else None
@@ -212,11 +152,7 @@ class EnergyDPODataLoader:
         self._raw_smiles = {}
         self.final_smiles = {}
         self.feature_cache = {}
-        self.graph_cache = {}
-
-        # GPU memory tracking
-        self.peak_encoding_memory_gb = 0.0
-
+        
         # Additional attributes for backward compatibility
         self.train_id_smiles = []
         self.val_id_smiles = []
@@ -233,10 +169,6 @@ class EnergyDPODataLoader:
 
     def prepare_data(self):
         """Main method to orchestrate data loading, processing, and feature computation."""
-        # Ensure cache directory exists before any cache operations (splits/features)
-        if self.enable_cache:
-            self.cache_dir.mkdir(parents=True, exist_ok=True)
-
         # Fast path: try external splits cache, then internal splits cache
         if self.external_splits_cache_file and self._load_splits_cache(self.external_splits_cache_file):
             logger.info(f"Loaded data splits from external cache: {self.external_splits_cache_file}")
@@ -246,19 +178,19 @@ class EnergyDPODataLoader:
             self._load_raw_data()
             self._select_final_smiles()
 
-        # For finetuned Uni-Mol, load graph cache early to avoid repeated RDKit work
-        if (
-            self.foundation_model == 'unimol'
-            and getattr(self.args, 'finetune_encoder', False)
-            and not self.graph_cache
-        ):
-            self._prepare_graph_cache()
+        # CRITICAL FIX: Always load separate test data when specified (even if cache was used)
+        # This ensures cross-dataset evaluation uses the correct test set
+        if self.test_data_file:
+            logger.info(f"Loading separate test data from: {self.test_data_file}")
+            self._load_test_data()
+            # Update final_smiles with cross-dataset test data
+            self.final_smiles['test_id'] = self._raw_smiles['test_id']
+            self.final_smiles['test_ood'] = self._raw_smiles['test_ood']
+            logger.info(f"Updated test data: {len(self.final_smiles['test_id'])} ID, {len(self.final_smiles['test_ood'])} OOD")
 
         if self.enable_cache:
+            self.cache_dir.mkdir(parents=True, exist_ok=True)
             self._prepare_features()
-        elif self.foundation_model == 'unimol' and getattr(self.args, 'finetune_encoder', False):
-            # Finetuning Uni-Mol cannot cache encoder outputs, but we can cache expensive RDKit graph builds
-            self._prepare_graph_cache()
 
         # CRITICAL FIX: Update compatibility attributes
         self._update_compatibility_attributes()
@@ -315,6 +247,41 @@ class EnergyDPODataLoader:
         logger.info("Raw data loaded. Found %d train_id, %d train_ood, %d val_id, %d val_ood smiles.",
                     len(self._raw_smiles['train_id']), len(self._raw_smiles['train_ood']),
                     len(self._raw_smiles['val_id']), len(self._raw_smiles['val_ood']))
+
+        # Load separate test data if specified (for cross-dataset evaluation)
+        if self.test_data_file:
+            logger.info(f"Loading separate test data from: {self.test_data_file}")
+            self._load_test_data()
+
+    def _load_test_data(self):
+        """Loads test data from a separate file for cross-dataset evaluation."""
+        if not os.path.exists(self.test_data_file):
+            raise FileNotFoundError(f"Could not find test data file: {self.test_data_file}")
+
+        # Determine test dataset type
+        test_dataset_lower = (self.test_drugood_subset or os.path.basename(self.test_data_file)).lower()
+
+        if 'drugood' in test_dataset_lower or 'lbap' in test_dataset_lower:
+            # Load DrugOOD test data
+            test_data_dict = process_drugood_data(self.test_data_file, None)  # No sampling for test
+        elif 'good' in test_dataset_lower:
+            # Load GOOD test data
+            test_data_dict = process_good_data(
+                dataset_name=self.test_drugood_subset or 'good_hiv',
+                domain=self.good_domain,
+                shift=self.good_shift,
+                data_path=os.path.dirname(self.test_data_file),
+                max_samples=None,
+                validate_smiles_flag=False
+            )
+        else:
+            raise ValueError(f"Unsupported test dataset type: {test_dataset_lower}")
+
+        # Override test splits with data from separate file
+        self._raw_smiles['test_id'] = test_data_dict.get('test_id_smiles', test_data_dict.get('val_id_smiles', []))
+        self._raw_smiles['test_ood'] = test_data_dict.get('test_ood_smiles', test_data_dict.get('val_ood_smiles', []))
+
+        logger.info(f"Loaded separate test data: {len(self._raw_smiles['test_id'])} test_id, {len(self._raw_smiles['test_ood'])} test_ood")
 
     def _select_final_smiles(self):
         """Sub-samples the raw data to meet the target sizes for each split with caching support."""
@@ -437,9 +404,6 @@ class EnergyDPODataLoader:
 
     def _save_splits_cache(self, cache_file, target_sizes):
         """Saves the current data splits to cache with metadata."""
-        # Create parent directories defensively (earlier should already make them)
-        cache_file.parent.mkdir(parents=True, exist_ok=True)
-
         cache_data = {
             'metadata': self._get_splits_cache_metadata(),
             'target_sizes': target_sizes,
@@ -483,18 +447,31 @@ class EnergyDPODataLoader:
 
     def _check_cross_split_overlap(self):
         """Check and report any cross-split overlap in SMILES data."""
-        splits_to_check = [
-            ('train_id', 'val_id'), ('train_id', 'test_id'),
-            ('train_ood', 'val_ood'), ('train_ood', 'test_ood'),
-            ('train_id', 'train_ood'), ('val_id', 'val_ood'), ('test_id', 'test_ood')
-        ]
-        
+        # For cross-dataset evaluation, test data comes from a different dataset,
+        # so overlap between train/val and test is expected and acceptable
+        if self.test_data_file:
+            logger.info("Cross-dataset evaluation mode: skipping train-test overlap checks")
+            splits_to_check = [
+                ('train_id', 'val_id'),
+                ('train_ood', 'val_ood'),
+                ('train_id', 'train_ood'),
+                ('val_id', 'val_ood'),
+                ('test_id', 'test_ood')  # Still check test ID vs OOD
+            ]
+        else:
+            # Normal mode: check all overlaps including train-test
+            splits_to_check = [
+                ('train_id', 'val_id'), ('train_id', 'test_id'),
+                ('train_ood', 'val_ood'), ('train_ood', 'test_ood'),
+                ('train_id', 'train_ood'), ('val_id', 'val_ood'), ('test_id', 'test_ood')
+            ]
+
         overlap_found = False
         for split1, split2 in splits_to_check:
             smiles1 = set(self.final_smiles.get(split1, []))
             smiles2 = set(self.final_smiles.get(split2, []))
             overlap = smiles1.intersection(smiles2)
-            
+
             if overlap:
                 overlap_found = True
                 logger.error(f"DATA LEAKAGE DETECTED: {len(overlap)} molecules overlap between {split1} and {split2}")
@@ -502,7 +479,7 @@ class EnergyDPODataLoader:
                     logger.error(f"Overlapping molecules: {list(overlap)}")
                 else:
                     logger.error(f"First 5 overlapping molecules: {list(overlap)[:5]}")
-        
+
         if overlap_found:
             error_msg = ("Cross-split overlap detected! This will cause data leakage in evaluation. "
                         "Training stopped to prevent invalid results.")
@@ -510,119 +487,6 @@ class EnergyDPODataLoader:
             raise ValueError(error_msg)
         else:
             logger.info("✅ No cross-split overlap detected - data splits are clean.")
-
-    def _get_graph_cache_path(self):
-        """Return cache path for Uni-Mol graph dicts (used in finetuning)."""
-        if 'drugood' in self.dataset_name.lower() or 'lbap' in self.dataset_name.lower():
-            base_name = self.drugood_subset if self.drugood_subset else self.dataset_name
-        else:
-            base_name = self.dataset_name
-
-        clean_name = (base_name or 'unknown_dataset').replace('/', '_').replace('-', '_')
-        if 'good' in clean_name:
-            filename = f"{clean_name}_{self.good_domain}_{self.good_shift}_graphs.pkl"
-        else:
-            filename = f"{clean_name}_graphs.pkl"
-        return self.cache_dir / filename
-
-    def _get_graph_cache_metadata(self):
-        """Metadata to validate graph cache compatibility."""
-        metadata = {
-            'dataset_name': self.dataset_name,
-            'data_seed': self.data_seed,
-            'foundation_model': self.foundation_model,
-            'finetune_encoder': getattr(self.args, 'finetune_encoder', False),
-            'max_samples': self.max_samples,
-        }
-        if 'drugood' in self.dataset_name.lower() or 'lbap' in self.dataset_name.lower():
-            metadata['drugood_subset'] = self.drugood_subset
-        if 'good' in self.dataset_name.lower():
-            metadata['good_domain'] = self.good_domain
-            metadata['good_shift'] = self.good_shift
-        return metadata
-
-    def _prepare_graph_cache(self):
-        """
-        Precompute Uni-Mol graph inputs (SMILES->graph tensors) once.
-        This removes expensive per-batch RDKit/3D work during finetuning while
-        still allowing gradients to flow through the encoder.
-        """
-        cache_path = self._get_graph_cache_path()
-
-        if cache_path.exists() and not self.force_recompute:
-            try:
-                with open(cache_path, 'rb') as f:
-                    cache_obj = pickle.load(f)
-                if isinstance(cache_obj, dict):
-                    cache_meta = cache_obj.get('metadata', {})
-                    if cache_meta and cache_meta != self._get_graph_cache_metadata():
-                        logger.info(f"Graph cache metadata mismatch -> rebuild. {cache_meta} != {self._get_graph_cache_metadata()}")
-                    else:
-                        graphs = cache_obj.get('graphs', cache_obj)
-                        self.graph_cache = graphs
-                        logger.info(f"Loaded Uni-Mol graph cache ({len(self.graph_cache)} molecules) from {cache_path}")
-                        return
-            except Exception as e:
-                logger.warning(f"Failed to load graph cache {cache_path}: {e}")
-
-        # Build cache from scratch
-        all_smiles = set()
-        for smiles_list in self.final_smiles.values():
-            all_smiles.update(smiles_list)
-
-        if not all_smiles:
-            logger.warning("No SMILES found to build graph cache.")
-            return
-
-        logger.info(
-            f"Building Uni-Mol graph cache for {len(all_smiles)} molecules "
-            f"(one-time RDKit/3D step) using {self.graph_cache_workers} worker(s)..."
-        )
-
-        smiles_to_process = [s for s in all_smiles if s not in self.graph_cache]
-
-        def _log_progress(idx, total):
-            if idx % 500 == 0 or idx == total:
-                logger.info(f"Graph caching progress: {idx}/{total} molecules")
-
-        if self.graph_cache_workers > 1 and len(smiles_to_process) > 1:
-            with cf.ProcessPoolExecutor(max_workers=self.graph_cache_workers) as executor:
-                for idx, (smiles, graph, err) in enumerate(
-                        executor.map(_smiles_to_graph_safe, smiles_to_process), 1):
-                    if graph is not None:
-                        self.graph_cache[smiles] = graph
-                    else:
-                        logger.error(f"Failed to cache graph for {smiles}: {err}")
-                    _log_progress(idx, len(smiles_to_process))
-        else:
-            for idx, smiles in enumerate(smiles_to_process, 1):
-                _, graph, err = _smiles_to_graph_safe(smiles)
-                if graph is not None:
-                    self.graph_cache[smiles] = graph
-                else:
-                    logger.error(f"Failed to cache graph for {smiles}: {err}")
-                _log_progress(idx, len(smiles_to_process))
-
-        if self.graph_cache:
-            self._save_graph_cache(cache_path)
-        else:
-            logger.warning("Graph cache is empty after processing.")
-
-    def _save_graph_cache(self, cache_path):
-        """Persist graph cache to disk for reuse."""
-        cache_path.parent.mkdir(parents=True, exist_ok=True)
-        cache_data = {
-            'metadata': self._get_graph_cache_metadata(),
-            'graphs': self.graph_cache,
-            'timestamp': datetime.now().isoformat()
-        }
-        try:
-            with open(cache_path, 'wb') as f:
-                pickle.dump(cache_data, f, protocol=pickle.HIGHEST_PROTOCOL)
-            size_mb = cache_path.stat().st_size / (1024 * 1024)
-            logger.info(f"Saved Uni-Mol graph cache to {cache_path} ({len(self.graph_cache)} molecules, {size_mb:.1f} MB)")
-        except Exception as e:
-            logger.warning(f"Failed to save graph cache to {cache_path}: {e}")
 
     def _prepare_features(self):
         """Manages the feature caching and computation process."""
@@ -755,11 +619,6 @@ class EnergyDPODataLoader:
         if not smiles_list:
             return {}
 
-        # Reset GPU memory stats to measure encoding memory
-        if torch.cuda.is_available():
-            torch.cuda.reset_peak_memory_stats()
-            logger.info("Starting foundation model encoding - GPU memory tracking enabled")
-
         # Dynamically import and instantiate the encoder to keep dependencies local
         if self.foundation_model == 'minimol':
             from model import MinimolEncoder
@@ -772,61 +631,28 @@ class EnergyDPODataLoader:
 
         computed_features = {}
         failed_smiles = set()
-        max_encoding_memory_gb = 0.0
-
-        total_batches = (len(smiles_list) + self.encoding_batch_size - 1) // self.encoding_batch_size
 
         for i in range(0, len(smiles_list), self.encoding_batch_size):
             batch_smiles = smiles_list[i:i + self.encoding_batch_size]
-            # If graph cache exists, use cached graphs to bypass RDKit
-            batch_inputs = [
-                self.graph_cache.get(s, s) if self.graph_cache else s
-                for s in batch_smiles
-            ]
-            batch_idx = i // self.encoding_batch_size + 1
             try:
-                features = encoder.encode_smiles(batch_inputs)
-
-                # Track peak GPU memory BEFORE moving to CPU
-                if torch.cuda.is_available():
-                    current_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
-                    max_encoding_memory_gb = max(max_encoding_memory_gb, current_memory_gb)
-
+                features = encoder.encode_smiles(batch_smiles)
                 for smiles, feature in zip(batch_smiles, features):
-                        computed_features[smiles] = feature.cpu()
+                    computed_features[smiles] = feature.cpu()
             except Exception as e:
                 logger.warning(f"Batch encoding failed: {e}. Retrying individually.")
                 for smiles in batch_smiles:
                     try:
-                        input_obj = self.graph_cache.get(smiles, smiles) if self.graph_cache else smiles
-                        feature = encoder.encode_smiles([input_obj])[0]
-
-                        # Track peak GPU memory BEFORE moving to CPU
-                        if torch.cuda.is_available():
-                            current_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
-                            max_encoding_memory_gb = max(max_encoding_memory_gb, current_memory_gb)
-
+                        feature = encoder.encode_smiles([smiles])[0]
                         computed_features[smiles] = feature.cpu()
                     except Exception as single_e:
                         logger.error(f"Failed to encode SMILES: {smiles}. Error: {single_e}")
                         failed_smiles.add(smiles)
 
-            # Progress logging per batch (helps avoid looking "stalled")
-            progress_pct = 100.0 * len(computed_features) / len(smiles_list)
-            logger.info(
-                f"Feature encoding progress: batch {batch_idx}/{total_batches} | "
-                f"{len(computed_features)}/{len(smiles_list)} molecules ({progress_pct:.1f}%)"
-            )
+            if i % (self.encoding_batch_size * 10) == 0:
+                logger.info(f"Computed features for {len(computed_features)}/{len(smiles_list)} molecules...")
 
         if failed_smiles:
             logger.warning(f"Total failed SMILES encodings: {len(failed_smiles)}")
-
-        # Store the maximum GPU memory observed during encoding
-        if torch.cuda.is_available() and max_encoding_memory_gb > 0:
-            logger.info(f"Peak GPU memory during encoding: {max_encoding_memory_gb:.2f} GB")
-            self.peak_encoding_memory_gb = max_encoding_memory_gb
-        else:
-            logger.info("No GPU memory was used during encoding (features may already be on CPU)")
 
         return computed_features
 
@@ -882,30 +708,7 @@ class EnergyDPODataLoader:
         generator = torch.Generator()
         generator.manual_seed(seed)
 
-        use_graph_cache = (
-            not self.enable_cache
-            and self.foundation_model == 'unimol'
-            and getattr(self.args, 'finetune_encoder', False)
-        )
-
-        if use_graph_cache:
-            if not self.graph_cache:
-                self._prepare_graph_cache()
-            if not self.graph_cache:
-                logger.warning("Graph cache unavailable, falling back to real-time encoding.")
-                use_graph_cache = False
-
-        if use_graph_cache:
-            logger.info("Creating DataLoaders with cached Uni-Mol graphs (finetuning fast path).")
-            train_dataset = GraphCachedEnergyDPODataset(
-                train_id_smiles, train_ood_smiles, self.graph_cache, mode='train', seed=seed
-            )
-            eval_dataset = GraphCachedEnergyDPODataset(
-                val_id_smiles, val_ood_smiles, self.graph_cache, mode='eval', seed=seed
-            )
-            collate_fn = graph_cached_energy_dpo_collate_fn
-
-        elif self.enable_cache:
+        if self.enable_cache:
             logger.info("Creating DataLoaders with pre-computed features.")
 
             # Helper to safely retrieve features from cache with type conversion
@@ -938,7 +741,7 @@ class EnergyDPODataLoader:
             train_dataset = EnergyDPODataset(train_id_smiles, train_ood_smiles, mode='train', seed=seed)
             eval_dataset = EnergyDPODataset(val_id_smiles, val_ood_smiles, mode='eval', seed=seed)
             collate_fn = energy_dpo_collate_fn
-            # 实时编码时 SMILES->图转换在 CPU 上，适当的 workers 有助于喂饱 GPU
+            num_workers = min(num_workers, 2)  # Reduce workers for real-time GPU encoding to avoid contention
 
         train_loader = DataLoader(
             train_dataset,

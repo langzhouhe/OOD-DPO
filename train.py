@@ -2,8 +2,10 @@ import os
 import json
 import glob
 import logging
+import time
 import torch
 import torch.optim as optim
+from torch.cuda.amp import autocast, GradScaler
 from tqdm import tqdm
 from data_loader import EnergyDPODataLoader
 from model import create_model
@@ -58,15 +60,57 @@ class EnergyDPOTrainer:
         self.model = create_model(args).to(self.device)
 
         # 4. Create optimizer and scheduler
-        self.optimizer = optim.AdamW(
-            self.model.parameters(),
-            lr=args.lr,
-            weight_decay=args.weight_decay
-        )
-        
+        # Check if encoder finetuning is enabled
+        finetune_encoder = getattr(args, 'finetune_encoder', False)
+
+        if finetune_encoder:
+            # Separate parameter groups for encoder and head
+            encoder_params = []
+            head_params = []
+
+            for name, param in self.model.named_parameters():
+                if 'encoder' in name and param.requires_grad:
+                    encoder_params.append(param)
+                else:
+                    head_params.append(param)
+
+            # Different learning rates for encoder and head
+            encoder_lr = getattr(args, 'encoder_lr', 5e-6)
+            head_lr = args.lr
+
+            self.optimizer = optim.AdamW([
+                {'params': encoder_params, 'lr': encoder_lr, 'name': 'encoder'},
+                {'params': head_params, 'lr': head_lr, 'name': 'head'}
+            ], weight_decay=args.weight_decay)
+
+            logger.info(f"Finetuning mode enabled:")
+            logger.info(f"  Encoder params: {len(encoder_params)} @ LR={encoder_lr}")
+            logger.info(f"  Head params: {len(head_params)} @ LR={head_lr}")
+
+            # Adjust batch size for finetuning (to avoid OOM)
+            if not hasattr(args, 'original_batch_size'):
+                args.original_batch_size = args.batch_size
+            if args.batch_size > 256:
+                logger.info(f"Reducing batch size from {args.batch_size} to 256 for finetuning")
+                args.batch_size = 256
+            if args.eval_batch_size > 512:
+                logger.info(f"Reducing eval batch size from {args.eval_batch_size} to 512 for finetuning")
+                args.eval_batch_size = 512
+        else:
+            # Default: single optimizer for all parameters (frozen encoder)
+            self.optimizer = optim.AdamW(
+                self.model.parameters(),
+                lr=args.lr,
+                weight_decay=args.weight_decay
+            )
+
+        # Enable mixed precision on CUDA to reduce memory footprint
+        self.use_amp = torch.cuda.is_available()
+        self.scaler = GradScaler(enabled=self.use_amp)
+
         self.scheduler = optim.lr_scheduler.StepLR(
-            self.optimizer, 
-            step_size=10, 
+            self.optimizer,
+            step_size=10,
             gamma=0.9
         )
 
@@ -152,22 +196,41 @@ class EnergyDPOTrainer:
         energy_separations = []
         all_id_scores = []
         all_ood_scores = []
-        
+        amp_enabled = getattr(self, 'scaler', None) is not None and self.scaler.is_enabled()
+
         with torch.no_grad():
             for batch_data in eval_dataloader:
                 # Compute loss (for logging)
-                loss, loss_dict = self.compute_energy_dpo_loss(batch_data=batch_data)
+                with autocast(enabled=amp_enabled):
+                    loss, loss_dict = self.compute_energy_dpo_loss(batch_data=batch_data)
                 total_loss += loss.item()
                 energy_separations.append(loss_dict['energy_separation'])
 
                 # Compute scores for AUROC (energy-based, OOD should be higher than ID)
                 try:
-                    id_scores = self.model.predict_ood_score_from_features(batch_data['id_features'])
-                    ood_scores = self.model.predict_ood_score_from_features(batch_data['ood_features'])
+                    if 'id_features' in batch_data and 'ood_features' in batch_data:
+                        with autocast(enabled=amp_enabled):
+                            id_scores = self.model.predict_ood_score_from_features(batch_data['id_features'])
+                            ood_scores = self.model.predict_ood_score_from_features(batch_data['ood_features'])
+                    elif 'id_graphs' in batch_data and 'ood_graphs' in batch_data:
+                        # Graphs cached: encode then score
+                        with autocast(enabled=amp_enabled):
+                            id_feats = self.model.encoder.encode_smiles(batch_data['id_graphs'])
+                            ood_feats = self.model.encoder.encode_smiles(batch_data['ood_graphs'])
+                        id_scores = self.model.predict_ood_score_from_features(id_feats)
+                        ood_scores = self.model.predict_ood_score_from_features(ood_feats)
+                    else:
+                        # Raw SMILES fallback
+                        id_scores = self.model.predict_ood_score(batch_data['id_smiles'])
+                        ood_scores = self.model.predict_ood_score(batch_data['ood_smiles'])
                 except Exception:
-                    # Fallback: compute directly through energy head
-                    id_scores = self.model.energy_head(batch_data['id_features'].to(next(self.model.parameters()).device)).squeeze(-1).detach().cpu().numpy()
-                    ood_scores = self.model.energy_head(batch_data['ood_features'].to(next(self.model.parameters()).device)).squeeze(-1).detach().cpu().numpy()
+                    # Last-resort fallback: compute directly through energy head if tensors are present
+                    with autocast(enabled=amp_enabled):
+                        id_tensor = batch_data.get('id_features') or self.model.encoder.encode_smiles(batch_data['id_smiles'])
+                        ood_tensor = batch_data.get('ood_features') or self.model.encoder.encode_smiles(batch_data['ood_smiles'])
+                        device = next(self.model.parameters()).device
+                        id_scores = self.model.energy_head(id_tensor.to(device)).squeeze(-1).detach().cpu().numpy()
+                        ood_scores = self.model.energy_head(ood_tensor.to(device)).squeeze(-1).detach().cpu().numpy()
 
                 all_id_scores.append(id_scores)
                 all_ood_scores.append(ood_scores)
@@ -263,23 +326,39 @@ class EnergyDPOTrainer:
     
     def train(self):
         """Start training"""
+        # Start timing
+        train_start_time = time.time()
+        epoch_times = []
+
         logger.info("Starting training...")
         logger.info(f"Device: {self.device}")
         logger.info(f"Output directory: {self.args.output_dir}")
         logger.info(f"Starting epoch: {self.start_epoch + 1}")
         logger.info(f"Total epochs: {self.args.epochs}")
-        
-        # Load data
+
+        # Load data (encoding happens here)
         data_loader = EnergyDPODataLoader(self.args)
+
+        # Get encoding memory if available
+        peak_encoding_memory_gb = getattr(data_loader, 'peak_encoding_memory_gb', 0.0)
+        if peak_encoding_memory_gb > 0:
+            logger.info(f"Foundation model encoding peak GPU memory: {peak_encoding_memory_gb:.2f} GB")
+
+        # Reset GPU memory stats for training phase
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+
         train_dataloader, eval_dataloader = data_loader.get_dataloaders()
         
         # Training loop - Use self.start_epoch as starting point
         for epoch in range(self.start_epoch, self.args.epochs):
+            epoch_start_time = time.time()
+
             self.model.train()
             train_losses = []
             # Training dynamics data collection
             epoch_dynamics = {'misranked_ratio': [], 'boundary_ratio': [], 'avg_margin': []}
-            
+
             # Set up progress bar
             use_tqdm = os.getenv('TQDM_DISABLE', '0') == '0'
             if use_tqdm:
@@ -290,16 +369,22 @@ class EnergyDPOTrainer:
             
             for batch_idx, batch_data in enumerate(progress_iter):
                 # Pass batch_data directly, model will automatically choose optimal path
-                loss, loss_dict = self.compute_energy_dpo_loss(batch_data=batch_data)
-                
-                # Backpropagation
                 self.optimizer.zero_grad()
-                loss.backward()
+                with autocast(enabled=self.use_amp):
+                    loss, loss_dict = self.compute_energy_dpo_loss(batch_data=batch_data)
                 
-                # Gradient clipping
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
-                
-                self.optimizer.step()
+                # Backpropagation with optional AMP
+                if self.use_amp:
+                    self.scaler.scale(loss).backward()
+                    # Unscale before clipping
+                    self.scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
+                    self.scaler.step(self.optimizer)
+                    self.scaler.update()
+                else:
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.args.grad_clip)
+                    self.optimizer.step()
                 self.global_step += 1
                 
                 # Record loss
@@ -382,12 +467,31 @@ class EnergyDPOTrainer:
                 }
                 self.save_training_dynamics(avg_dynamics)
             
+            epoch_time = time.time() - epoch_start_time
+            epoch_times.append(epoch_time)
+
+            # Calculate timing statistics
+            avg_epoch_time_so_far = sum(epoch_times) / len(epoch_times)
+            elapsed_time = time.time() - train_start_time
+            elapsed_hours = int(elapsed_time // 3600)
+            elapsed_mins = int((elapsed_time % 3600) // 60)
+            elapsed_secs = int(elapsed_time % 60)
+
+            # Estimate remaining time
+            epochs_completed = len(epoch_times)
+            epochs_remaining = self.args.epochs - (epoch + 1)
+            eta_seconds = avg_epoch_time_so_far * epochs_remaining
+            eta_hours = int(eta_seconds // 3600)
+            eta_mins = int((eta_seconds % 3600) // 60)
+            eta_secs = int(eta_seconds % 60)
+
             logger.info(f"Epoch {epoch+1} completed:")
             logger.info(f"  Training loss: {avg_train_loss:.4f}")
             logger.info(f"  Validation loss: {eval_loss_dict['total_loss']:.4f}")
             logger.info(f"  Energy separation: {eval_loss_dict['energy_separation']:.4f}")
             logger.info(f"  Val-AUROC: {eval_loss_dict['val_auroc']:.4f} (AUPR: {eval_loss_dict['val_aupr']:.4f}, FPR95: {eval_loss_dict['val_fpr95']:.4f})")
-            
+            logger.info(f"  Epoch time: {epoch_time:.2f}s | Avg: {avg_epoch_time_so_far:.2f}s | Elapsed: {elapsed_hours:02d}:{elapsed_mins:02d}:{elapsed_secs:02d} | ETA: {eta_hours:02d}:{eta_mins:02d}:{eta_secs:02d}")
+
             # Update learning rate
             self.scheduler.step()
             
@@ -409,13 +513,40 @@ class EnergyDPOTrainer:
                 logger.info(f"Early stopping triggered: {self.epochs_no_improve} consecutive epochs without improvement (patience={self.patience})")
                 break
         
+        # Calculate timing and memory stats
+        total_train_time = time.time() - train_start_time
+        avg_epoch_time = sum(epoch_times) / len(epoch_times) if epoch_times else 0
+
+        # Format total training time
+        total_hours = int(total_train_time // 3600)
+        total_mins = int((total_train_time % 3600) // 60)
+        total_secs = int(total_train_time % 60)
+
+        # Get peak GPU memory
+        peak_gpu_memory_gb = 0
+        if torch.cuda.is_available():
+            peak_gpu_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+
         logger.info("Training completed!")
         logger.info(f"Best Val-AUROC: {self.best_eval_metric:.4f}")
-        
+        logger.info(f"Total training time: {total_hours:02d}:{total_mins:02d}:{total_secs:02d} ({total_train_time:.2f} seconds)")
+        logger.info(f"Average epoch time: {avg_epoch_time:.2f} seconds")
+        logger.info(f"Peak GPU memory (training): {peak_gpu_memory_gb:.2f}GB")
+        if peak_encoding_memory_gb > 0:
+            logger.info(f"Peak GPU memory (encoding): {peak_encoding_memory_gb:.2f}GB")
+
         # Save configuration file
         args_path = os.path.join(self.args.output_dir, 'config.json')
         with open(args_path, 'w') as f:
             json.dump(vars(self.args), f, indent=2, ensure_ascii=False)
+
+        # Return timing and memory stats (including encoding memory)
+        return {
+            'train_time_seconds': total_train_time,
+            'avg_epoch_time_seconds': avg_epoch_time,
+            'peak_gpu_memory_train_gb': peak_gpu_memory_gb,
+            'peak_gpu_memory_encoding_gb': peak_encoding_memory_gb
+        }
 
 def main():
     logging.basicConfig(level=logging.INFO)

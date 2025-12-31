@@ -24,17 +24,9 @@ def parse_args():
                         help="Data sampling seed (fixed to ensure consistent data across experiments)")
 
     # Foundation model selection
-    parser.add_argument("--foundation_model", type=str, default="minimol",
+    parser.add_argument("--foundation_model", type=str, default="minimol", 
                         choices=['minimol', 'unimol'],
                         help="Foundation model encoder: minimol or unimol")
-
-    # Encoder finetuning parameters
-    parser.add_argument("--finetune_encoder", action='store_true', default=False,
-                        help="Enable encoder finetuning (only for unimol)")
-    parser.add_argument("--encoder_lr", type=float, default=5e-6,
-                        help="Learning rate for encoder when finetuning")
-    parser.add_argument("--freeze_layers", type=str, default='0-12',
-                        help="Layers to freeze (e.g., '0-12' for freezing first 13 layers)")
 
     # Dataset parameters
     parser.add_argument("--dataset", type=str, required=True,
@@ -45,6 +37,12 @@ def parse_args():
     # DrugOOD specific parameters
     parser.add_argument("--drugood_subset", type=str, default=None,
                         help="DrugOOD subset. If not provided, will use --dataset value")
+
+    # Test dataset parameters (for cross-dataset evaluation)
+    parser.add_argument("--test_data_file", type=str, default=None,
+                        help="Separate test data file path (optional, for cross-dataset testing)")
+    parser.add_argument("--test_drugood_subset", type=str, default=None,
+                        help="Test dataset subset name (optional, used with --test_data_file)")
 
     # GOOD data specific parameters
     parser.add_argument("--good_domain", type=str, default="scaffold", choices=['scaffold', 'size'],
@@ -60,9 +58,9 @@ def parse_args():
                    choices=["dpo", "bce", "mse", "hinge"],
                    help="Loss function type")
     parser.add_argument("--hinge_margin", type=float, default=1.0, help="Margin parameter for Hinge Loss")
-    parser.add_argument("--hinge_topk", type=float, default=0.0, help="Hinge in-batch hard mining ratio (0 to disable, 0.25 for hardest 25 percent)")
-    parser.add_argument("--hinge_squared", action='store_true', help="Use squared Hinge loss: relu(m-delta)^2")
-    parser.add_argument("--lambda_reg", type=float, default=1e-2, help="L2 regularization coefficient lambda for output energy")
+    parser.add_argument("--hinge_topk", type=float, default=0.0, help="Hinge in-batch hard mining ratio (0 to disable, 0.25 for hardest 25%)")
+    parser.add_argument("--hinge_squared", action='store_true', help="Use squared Hinge loss: relu(m-Δ)^2")
+    parser.add_argument("--lambda_reg", type=float, default=1e-2, help="L2 regularization coefficient λ for output energy")
 
     # Training parameters
     parser.add_argument("--epochs", type=int, default=50, help="Training epochs")
@@ -79,8 +77,7 @@ def parse_args():
     parser.add_argument("--precompute_features", action='store_true', default=True, help="Precompute feature cache")
     parser.add_argument("--force_recompute_cache", action='store_true', help="Force recompute cache")
     parser.add_argument("--cache_root", type=str, default="/home/ubuntu/projects", help="Cache root directory")
-    parser.add_argument("--encoding_batch_size", type=int, default=1000,
-                        help="Encoding batch size (increase for faster feature computation on GPU)")
+    parser.add_argument("--encoding_batch_size", type=int, default=50, help="Encoding batch size")
     # Optional external caches
     parser.add_argument("--feature_cache_file", type=str, default=None,
                         help="Path to a precomputed feature cache pkl to use directly")
@@ -105,7 +102,6 @@ def parse_args():
     
     # DataLoader parameters
     parser.add_argument("--num_workers", type=int, default=8, help="Number of data loader workers")
-    parser.add_argument("--graph_cache_workers", type=int, default=16, help="Workers for one-time Uni-Mol graph caching (preprocess SMILES -> graph)")
     
     # Dataset type auto-inference
     parser.add_argument("--dataset_type", type=str, default=None, 
@@ -176,7 +172,7 @@ def check_required_modules():
     
     try:
         from train import EnergyDPOTrainer
-        from evaluation import EnergyDPOEvaluator
+        from evaluation_generalization import EnergyDPOEvaluator
         logger.info("All required modules loaded")
         return True
     except ImportError as e:
@@ -186,24 +182,7 @@ def check_required_modules():
 def validate_args(args):
     """Validate arguments"""
     logger = logging.getLogger(__name__)
-
-    # Check finetuning configuration
-    if args.finetune_encoder:
-        if args.foundation_model != 'unimol':
-            logger.warning(f"Finetuning is only supported for unimol, but got {args.foundation_model}")
-            logger.warning("Disabling finetune_encoder flag")
-            args.finetune_encoder = False
-        else:
-            if args.mode == 'train' and args.precompute_features:
-                # Training: encoder weights change, so caching encoder outputs would go stale
-                logger.warning("Finetuning TRAIN mode - disabling feature caching for training data")
-                logger.warning("(Features will be computed dynamically as encoder is being updated)")
-                args.precompute_features = False
-            elif args.mode in ['eval', 'predict'] and not args.precompute_features:
-                # Evaluation/predict: safe to precompute features with the loaded finetuned encoder
-                logger.info("Finetuning EVAL/PREDICT - enabling feature caching for faster evaluation")
-                args.precompute_features = True
-
+    
     # Auto-infer dataset type
     if args.dataset_type is None:
         if args.dataset.lower().startswith('good_'):
@@ -255,37 +234,23 @@ def find_model_file(args):
 def run_training(args):
     """Run training"""
     from train import EnergyDPOTrainer
-    import json
     logger = logging.getLogger(__name__)
-
+    
     logger.info(f"Starting training (Foundation Model: {args.foundation_model})")
-
+    
     trainer = EnergyDPOTrainer(args)
-    training_stats = trainer.train()
-
-    # Save training stats to file
-    if training_stats:
-        stats_file = os.path.join(args.output_dir, 'training_stats.json')
-        with open(stats_file, 'w') as f:
-            json.dump(training_stats, f, indent=2)
-        logger.info(f"Training stats saved to: {stats_file}")
-
+    trainer.train()
+    
     logger.info("Training completed")
 
 def run_evaluation(args):
     """Run evaluation"""
-    from evaluation import EnergyDPOEvaluator
-    from data_loader import EnergyDPODataLoader
+    from evaluation_generalization import EnergyDPOEvaluator
+    from data_loader_generalization import EnergyDPODataLoader
     logger = logging.getLogger(__name__)
     
     logger.info(f"Starting evaluation (Foundation Model: {args.foundation_model})")
     logger.info(f"Model path: {args.model_path}")
-
-    # Evaluation should use cached features to avoid slow SMILES encoding
-    if args.finetune_encoder and args.foundation_model == 'unimol':
-        if not args.precompute_features:
-            logger.info("Enabling precompute_features for finetuned Uni-Mol evaluation to speed up scoring")
-        args.precompute_features = True
     
     evaluator = EnergyDPOEvaluator(args.model_path, args)
     
@@ -337,7 +302,7 @@ def run_evaluation(args):
 
 def run_prediction(args):
     """Run prediction"""
-    from evaluation import EnergyDPOEvaluator
+    from evaluation_generalization import EnergyDPOEvaluator
     logger = logging.getLogger(__name__)
     
     logger.info(f"Starting prediction (Foundation Model: {args.foundation_model})")

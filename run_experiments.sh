@@ -72,13 +72,13 @@ def run_experiment(dataset, seed, foundation_model="minimol", data_seed=42):
     env['TQDM_DISABLE'] = '0'
     env['SHOW_PROGRESS'] = '1'
     
-    # Model-specific parameters
+    # Model-specific parameters - OPTIMIZED FOR 80GB A100
     if foundation_model == "unimol":
-        batch_size = "256"
-        eval_batch_size = "128"
+        batch_size = "4096"  # Increased from 256 -> 1024 -> 4096 for better GPU utilization
+        eval_batch_size = "4096"  # Increased from 128 -> 1024 -> 4096
     else:
-        batch_size = "512"
-        eval_batch_size = "256"
+        batch_size = "8192"  # Increased from 512 -> 2048 -> 8192 for better GPU utilization
+        eval_batch_size = "4096"  # Increased from 256 -> 1024 -> 4096
     
     # Training command - UPDATED CACHE PATH
     train_cmd = [
@@ -97,7 +97,7 @@ def run_experiment(dataset, seed, foundation_model="minimol", data_seed=42):
         "--eval_steps", "25",
         "--precompute_features",
         "--cache_root", "/home/ubuntu/projects",
-        "--encoding_batch_size", "50"
+        "--encoding_batch_size", "500"  # Increased from 50 for better GPU utilization
     ]
     
     print(f"Training {dataset} (seed={seed}, model={foundation_model})")
@@ -142,14 +142,37 @@ def run_experiment(dataset, seed, foundation_model="minimol", data_seed=42):
     
     # Read results
     eval_results_file = os.path.join(output_dir, "ood_evaluation_results.json")
+    training_stats_file = os.path.join(output_dir, "training_stats.json")
     try:
+        # Read evaluation results
         with open(eval_results_file, 'r') as f:
             results = json.load(f)
         auroc = results.get("auroc", 0)
         aupr = results.get("aupr", 0)
         fpr95 = results.get("fpr95", 1)
-        print(f"AUROC: {auroc:.4f}, AUPR: {aupr:.4f}, FPR95: {fpr95:.4f}")
-        return {"auroc": auroc, "aupr": aupr, "fpr95": fpr95}
+        eval_time = results.get("eval_time_seconds", 0)
+        eval_gpu = results.get("peak_gpu_memory_eval_gb", 0)
+
+        # Read training stats
+        train_time = 0
+        avg_epoch_time = 0
+        train_gpu = 0
+        if os.path.exists(training_stats_file):
+            with open(training_stats_file, 'r') as f:
+                train_stats = json.load(f)
+            train_time = train_stats.get("train_time_seconds", 0)
+            avg_epoch_time = train_stats.get("avg_epoch_time_seconds", 0)
+            train_gpu = train_stats.get("peak_gpu_memory_train_gb", 0)
+
+        print(f"AUROC: {auroc:.2f}, AUPR: {aupr:.2f}, FPR95: {fpr95:.2f}, Train: {train_time:.1f}s, Eval: {eval_time:.1f}s")
+        return {
+            "auroc": auroc, "aupr": aupr, "fpr95": fpr95,
+            "train_time_seconds": train_time,
+            "eval_time_seconds": eval_time,
+            "avg_epoch_time_seconds": avg_epoch_time,
+            "peak_gpu_memory_train_gb": train_gpu,
+            "peak_gpu_memory_eval_gb": eval_gpu
+        }
     except Exception as e:
         print(f"Failed to read results: {e}")
         return None
@@ -157,14 +180,14 @@ def run_experiment(dataset, seed, foundation_model="minimol", data_seed=42):
 def main():
     datasets = [
         "lbap_general_ec50_assay",
-        "lbap_general_ec50_scaffold", 
-        "lbap_general_ec50_size",
-        "lbap_general_ic50_assay",
-        "lbap_general_ic50_scaffold",
-        "lbap_general_ic50_size"
+        # "lbap_general_ec50_scaffold", 
+        # "lbap_general_ec50_size",
+        # "lbap_general_ic50_assay",
+        # "lbap_general_ic50_scaffold",
+        # "lbap_general_ic50_size"
     ]
     
-    seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    seeds = [1]
     foundation_model = "minimol"  
     data_seed = 42
     
@@ -183,6 +206,11 @@ def main():
         dataset_aucs = []
         dataset_auprs = []
         dataset_fpr95s = []
+        dataset_train_times = []
+        dataset_eval_times = []
+        dataset_epoch_times = []
+        dataset_train_gpu = []
+        dataset_eval_gpu = []
 
         for seed in seeds:
             completed_experiments += 1
@@ -193,7 +221,12 @@ def main():
                 dataset_aucs.append(result["auroc"])
                 dataset_auprs.append(result["aupr"])
                 dataset_fpr95s.append(result["fpr95"])
-                print(f"Success, AUROC = {result['auroc']:.4f}, AUPR = {result['aupr']:.4f}, FPR95 = {result['fpr95']:.4f}")
+                dataset_train_times.append(result.get("train_time_seconds", 0))
+                dataset_eval_times.append(result.get("eval_time_seconds", 0))
+                dataset_epoch_times.append(result.get("avg_epoch_time_seconds", 0))
+                dataset_train_gpu.append(result.get("peak_gpu_memory_train_gb", 0))
+                dataset_eval_gpu.append(result.get("peak_gpu_memory_eval_gb", 0))
+                print(f"Success, AUROC = {result['auroc']:.2f}, AUPR = {result['aupr']:.2f}, FPR95 = {result['fpr95']:.2f}")
             else:
                 print("Failed")
 
@@ -205,6 +238,18 @@ def main():
             fpr95_mean = np.mean(dataset_fpr95s)
             fpr95_std = np.std(dataset_fpr95s, ddof=1) if len(dataset_fpr95s) > 1 else 0
 
+            # Calculate timing and memory stats
+            train_time_mean = np.mean(dataset_train_times) if dataset_train_times else 0
+            train_time_std = np.std(dataset_train_times, ddof=1) if len(dataset_train_times) > 1 else 0
+            eval_time_mean = np.mean(dataset_eval_times) if dataset_eval_times else 0
+            eval_time_std = np.std(dataset_eval_times, ddof=1) if len(dataset_eval_times) > 1 else 0
+            epoch_time_mean = np.mean(dataset_epoch_times) if dataset_epoch_times else 0
+            epoch_time_std = np.std(dataset_epoch_times, ddof=1) if len(dataset_epoch_times) > 1 else 0
+            train_gpu_mean = np.mean(dataset_train_gpu) if dataset_train_gpu else 0
+            train_gpu_std = np.std(dataset_train_gpu, ddof=1) if len(dataset_train_gpu) > 1 else 0
+            eval_gpu_mean = np.mean(dataset_eval_gpu) if dataset_eval_gpu else 0
+            eval_gpu_std = np.std(dataset_eval_gpu, ddof=1) if len(dataset_eval_gpu) > 1 else 0
+
             results[dataset] = {
                 'auroc_mean': auroc_mean,
                 'auroc_std': auroc_std,
@@ -212,6 +257,16 @@ def main():
                 'aupr_std': aupr_std,
                 'fpr95_mean': fpr95_mean,
                 'fpr95_std': fpr95_std,
+                'train_time_mean': train_time_mean,
+                'train_time_std': train_time_std,
+                'eval_time_mean': eval_time_mean,
+                'eval_time_std': eval_time_std,
+                'epoch_time_mean': epoch_time_mean,
+                'epoch_time_std': epoch_time_std,
+                'train_gpu_mean': train_gpu_mean,
+                'train_gpu_std': train_gpu_std,
+                'eval_gpu_mean': eval_gpu_mean,
+                'eval_gpu_std': eval_gpu_std,
                 'aucs': dataset_aucs,
                 'auprs': dataset_auprs,
                 'fpr95s': dataset_fpr95s,
@@ -222,6 +277,8 @@ def main():
             generate_dataset_metrics_file(foundation_model, dataset, auroc_mean, auroc_std, aupr_mean, aupr_std, fpr95_mean, fpr95_std, len(dataset_aucs))
 
             print(f"Summary: AUROC={auroc_mean:.3f}±{auroc_std:.3f}, AUPR={aupr_mean:.3f}±{aupr_std:.3f}, FPR95={fpr95_mean:.3f}±{fpr95_std:.3f} (success {len(dataset_aucs)}/{len(seeds)})")
+            print(f"  Train Time: {train_time_mean:.2f}±{train_time_std:.2f}s | Eval Time: {eval_time_mean:.2f}±{eval_time_std:.2f}s | Avg Epoch: {epoch_time_mean:.2f}±{epoch_time_std:.2f}s")
+            print(f"  Peak GPU (Train): {train_gpu_mean:.2f}±{train_gpu_std:.2f}GB | Peak GPU (Eval): {eval_gpu_mean:.2f}±{eval_gpu_std:.2f}GB")
         else:
             print("All experiments failed")
     
@@ -248,7 +305,20 @@ def main():
             overall_aupr_means.append(aupr_mean)
             overall_fpr95_means.append(fpr95_mean)
 
+            train_time_mean = data.get('train_time_mean', 0)
+            train_time_std = data.get('train_time_std', 0)
+            eval_time_mean = data.get('eval_time_mean', 0)
+            eval_time_std = data.get('eval_time_std', 0)
+            epoch_time_mean = data.get('epoch_time_mean', 0)
+            epoch_time_std = data.get('epoch_time_std', 0)
+            train_gpu_mean = data.get('train_gpu_mean', 0)
+            train_gpu_std = data.get('train_gpu_std', 0)
+            eval_gpu_mean = data.get('eval_gpu_mean', 0)
+            eval_gpu_std = data.get('eval_gpu_std', 0)
+
             print(f"{dataset:30s}: AUROC={auroc_mean:.3f}±{auroc_std:.3f}, AUPR={aupr_mean:.3f}±{aupr_std:.3f}, FPR95={fpr95_mean:.3f}±{fpr95_std:.3f} ({n_success}/{len(seeds)})")
+            print(f"{'':{30}}  Train: {train_time_mean:.2f}±{train_time_std:.2f}s | Eval: {eval_time_mean:.2f}±{eval_time_std:.2f}s | Epoch: {epoch_time_mean:.2f}±{epoch_time_std:.2f}s")
+            print(f"{'':{30}}  GPU Train: {train_gpu_mean:.2f}±{train_gpu_std:.2f}GB | GPU Eval: {eval_gpu_mean:.2f}±{eval_gpu_std:.2f}GB")
 
         print("-" * 60)
         overall_auroc_mean = np.mean(overall_auroc_means)

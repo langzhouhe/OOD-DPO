@@ -1,0 +1,167 @@
+2025-11-19 19:17:38,759 - __main__ - INFO - ================================================================================
+2025-11-19 19:17:38,759 - __main__ - INFO - SUPERVISED BASELINE OOD DETECTION FOR MOLECULAR GRAPHS
+2025-11-19 19:17:38,759 - __main__ - INFO - ================================================================================
+2025-11-19 19:17:38,759 - __main__ - INFO - Dataset:           drugood_lbap_general_ec50_assay
+2025-11-19 19:17:38,759 - __main__ - INFO - Foundation Model:  minimol
+2025-11-19 19:17:38,759 - __main__ - INFO - Method:            conformal
+2025-11-19 19:17:38,759 - __main__ - INFO - Data Path:         ./data/raw
+2025-11-19 19:17:38,759 - __main__ - INFO - Cache Root:        ./cache
+2025-11-19 19:17:38,759 - __main__ - INFO - Output Dir:        ./test_baseline_results
+2025-11-19 19:17:38,759 - __main__ - INFO - Device:            cuda
+2025-11-19 19:17:38,759 - __main__ - INFO - Random Seed:       42
+2025-11-19 19:17:38,759 - __main__ - INFO - Data Seed:         42
+2025-11-19 19:17:38,759 - __main__ - INFO - Feature Caching:   True
+2025-11-19 19:17:38,759 - __main__ - INFO - GOOD Domain:       scaffold
+2025-11-19 19:17:38,759 - __main__ - INFO - GOOD Shift:        covariate
+2025-11-19 19:17:38,759 - __main__ - INFO - DrugOOD Subset:    lbap_general_ec50_assay
+2025-11-19 19:17:38,759 - __main__ - INFO - --------------------------------------------------------------------------------
+2025-11-19 19:17:38,759 - __main__ - INFO - Model Configuration:
+2025-11-19 19:17:38,760 - __main__ - INFO -   Hidden Channels:  64
+2025-11-19 19:17:38,760 - __main__ - INFO -   Num Layers:       3
+2025-11-19 19:17:38,760 - __main__ - INFO -   Dropout:          0.5
+2025-11-19 19:17:38,760 - __main__ - INFO -   Learning Rate:    0.01
+2025-11-19 19:17:38,760 - __main__ - INFO -   Batch Size:       32
+2025-11-19 19:17:38,760 - __main__ - INFO -   Max Epochs:       10
+2025-11-19 19:17:38,760 - __main__ - INFO - ================================================================================
+2025-11-19 19:17:38,760 - __main__ - INFO - 
+================================================================================
+2025-11-19 19:17:38,760 - __main__ - INFO - DATA LOADING WITH SUPERVISED APPROACH
+2025-11-19 19:17:38,760 - __main__ - INFO - ================================================================================
+2025-11-19 19:17:38,760 - __main__ - INFO - Key improvements over EnergyDPODataLoader:
+2025-11-19 19:17:38,760 - __main__ - INFO - ✅ Uses SupervisedBaselineDataLoader for real classification labels
+2025-11-19 19:17:38,760 - __main__ - INFO - ✅ Reuses existing data splits and feature caches for fair comparison
+2025-11-19 19:17:38,760 - __main__ - INFO - ✅ Provides proper supervised training with real target labels
+2025-11-19 19:17:38,760 - __main__ - INFO - ✅ Seamless integration with foundation model features
+2025-11-19 19:17:38,760 - __main__ - INFO - ✅ Comprehensive label caching system for efficiency
+2025-11-19 19:17:38,760 - __main__ - INFO - --------------------------------------------------------------------------------
+2025-11-19 19:17:38,760 - __main__ - INFO - Training Process:
+2025-11-19 19:17:38,760 - __main__ - INFO - 1. Load data with SupervisedBaselineDataLoader (inherits from EnergyDPODataLoader)
+2025-11-19 19:17:38,760 - __main__ - INFO - 2. Extract real classification labels for ID data
+2025-11-19 19:17:38,760 - __main__ - INFO - 3. Train supervised classifier on ID data with real labels
+2025-11-19 19:17:38,760 - __main__ - INFO - 4. Evaluate OOD detection using baseline methods (MSP, Energy, ODIN, Mahalanobis)
+2025-11-19 19:17:38,760 - __main__ - INFO - 5. Test on proper ID/OOD test splits
+2025-11-19 19:17:38,760 - __main__ - INFO - ================================================================================
+2025-11-19 19:17:38,760 - __main__ - INFO - PyTorch version: 2.5.1
+2025-11-19 19:17:38,760 - __main__ - INFO - SupervisedBaselineDataLoader found
+2025-11-19 19:17:38,760 - __main__ - INFO - Baseline trainer and evaluator found
+2025-11-19 19:17:38,760 - __main__ - INFO - Baseline models found
+2025-11-19 19:17:38,760 - __main__ - INFO - scikit-learn version: 1.7.0
+2025-11-19 19:17:38,760 - __main__ - INFO - RDKit found for molecular property computation
+2025-11-19 19:17:38,761 - __main__ - INFO - Foundation model encoders found
+2025-11-19 19:17:38,761 - __main__ - INFO - Starting supervised baseline evaluation...
+2025-11-19 19:17:38,761 - __main__ - INFO - Running single baseline method: CONFORMAL
+2025-11-19 19:17:38,761 - __main__ - INFO - This will:
+2025-11-19 19:17:38,761 - __main__ - INFO - 1. Load data using SupervisedBaselineDataLoader
+2025-11-19 19:17:38,761 - __main__ - INFO - 2. Train supervised classifier backbone with real labels
+2025-11-19 19:17:38,761 - __main__ - INFO - 3. Evaluate CONFORMAL baseline method
+2025-11-19 19:17:38,761 - __main__ - INFO - 
+Training supervised classifier backbone...
+2025-11-19 19:17:38,761 - baseline_trainer - INFO - Initializing SupervisedBaselineDataLoader...
+2025-11-19 19:17:38,761 - SupervisedBaselineDataLoader - INFO - === Initializing SupervisedBaselineDataLoader ===
+2025-11-19 19:17:38,761 - SupervisedBaselineDataLoader - INFO - Inheriting from EnergyDPODataLoader for consistent data splits...
+2025-11-19 19:17:38,761 - data_loader - INFO - === Starting OOD Data Preparation ===
+2025-11-19 19:17:38,761 - data_loader - INFO - Dataset: drugood_lbap_general_ec50_assay | Foundation Model: minimol | Data Seed: 42
+2025-11-19 19:17:38,764 - data_loader - INFO - Loaded splits cache with 7200 total molecules from: cache/ood_dpo_cache/lbap_general_ec50_assay_seed42_splits.json
+2025-11-19 19:17:38,764 - data_loader - INFO - Loaded data splits from cache early - skipping raw data loading
+2025-11-19 19:17:38,803 - data_loader - INFO - Cache check: cached='minimol' vs current='minimol'
+2025-11-19 19:17:38,811 - data_loader - INFO - Loaded 7200 features from cache: cache/ood_dpo_cache/lbap_general_ec50_assay_minimol_features.pkl
+2025-11-19 19:17:38,813 - data_loader - INFO - All required features were found in the cache.
+2025-11-19 19:17:38,813 - data_loader - INFO - ==================================================
+2025-11-19 19:17:38,814 - data_loader - INFO - Final Dataset Summary:
+2025-11-19 19:17:38,814 - data_loader - INFO -   - train_id  :  2000 samples
+2025-11-19 19:17:38,814 - data_loader - INFO -   - train_ood :  2000 samples
+2025-11-19 19:17:38,814 - data_loader - INFO -   - val_id    :   600 samples
+2025-11-19 19:17:38,814 - data_loader - INFO -   - val_ood   :   600 samples
+2025-11-19 19:17:38,814 - data_loader - INFO -   - test_id   :  1000 samples
+2025-11-19 19:17:38,814 - data_loader - INFO -   - test_ood  :  1000 samples
+2025-11-19 19:17:38,814 - data_loader - INFO - ==================================================
+2025-11-19 19:17:38,814 - data_loader - INFO - Data preparation complete.
+2025-11-19 19:17:38,814 - SupervisedBaselineDataLoader - INFO - Loading classification labels for supervised training...
+2025-11-19 19:17:38,814 - SupervisedBaselineDataLoader - INFO - Loaded labels cache with 3600 total labels from: cache/ood_dpo_cache/lbap_general_ec50_assay_seed42_labels.json
+2025-11-19 19:17:38,814 - SupervisedBaselineDataLoader - INFO - SupervisedBaselineDataLoader initialization complete.
+2025-11-19 19:17:38,814 - SupervisedBaselineDataLoader - INFO - Available label splits: ['train_id', 'val_id', 'test_id']
+2025-11-19 19:17:38,814 - baseline_trainer - INFO - Detected 2 classes in the dataset
+2025-11-19 19:17:38,814 - baseline_trainer - INFO - Using foundation model features: dim=512
+2025-11-19 19:17:38,836 - baseline_trainer - INFO - Starting supervised baseline training with real labels...
+2025-11-19 19:17:38,841 - SupervisedBaselineDataLoader - INFO - SupervisedFeatureDataset: 2000 samples, feature dim: 512
+2025-11-19 19:17:38,842 - SupervisedBaselineDataLoader - INFO - SupervisedFeatureDataset: 600 samples, feature dim: 512
+2025-11-19 19:17:38,842 - baseline_trainer - INFO - Training loader: 2000 samples
+2025-11-19 19:17:38,842 - baseline_trainer - INFO - Validation loader: 600 samples
+2025-11-19 19:17:38,997 - baseline_trainer - INFO - Model created: 37250 parameters
+2025-11-19 19:17:39,835 - baseline_trainer - INFO - Using CrossEntropyLoss for single-task classification
+2025-11-19 19:17:39,836 - baseline_trainer - INFO - Starting training for 10 epochs...
+2025-11-19 19:17:40,335 - baseline_trainer - INFO - Epoch   1: Train Loss: 0.4776, Train Acc: 0.8185, Val Loss: 0.5157, Val Acc: 0.8150, Time: 0.50s
+2025-11-19 19:17:40,338 - baseline_trainer - INFO - Saved best model with val_acc: 0.8150
+2025-11-19 19:17:40,524 - baseline_trainer - INFO - Epoch   2: Train Loss: 0.4622, Train Acc: 0.8285, Val Loss: 0.5536, Val Acc: 0.8150, Time: 0.19s
+2025-11-19 19:17:40,703 - baseline_trainer - INFO - Epoch   3: Train Loss: 0.4581, Train Acc: 0.8280, Val Loss: 0.4693, Val Acc: 0.8150, Time: 0.18s
+2025-11-19 19:17:40,873 - baseline_trainer - INFO - Epoch   4: Train Loss: 0.4351, Train Acc: 0.8280, Val Loss: 0.4468, Val Acc: 0.8150, Time: 0.17s
+2025-11-19 19:17:41,049 - baseline_trainer - INFO - Epoch   5: Train Loss: 0.4383, Train Acc: 0.8280, Val Loss: 0.5006, Val Acc: 0.8150, Time: 0.18s
+2025-11-19 19:17:41,218 - baseline_trainer - INFO - Epoch   6: Train Loss: 0.4352, Train Acc: 0.8280, Val Loss: 0.5093, Val Acc: 0.8150, Time: 0.17s
+2025-11-19 19:17:41,393 - baseline_trainer - INFO - Epoch   7: Train Loss: 0.4220, Train Acc: 0.8280, Val Loss: 0.4280, Val Acc: 0.8150, Time: 0.17s
+2025-11-19 19:17:41,572 - baseline_trainer - INFO - Epoch   8: Train Loss: 0.4320, Train Acc: 0.8280, Val Loss: 0.5081, Val Acc: 0.8150, Time: 0.18s
+2025-11-19 19:17:41,750 - baseline_trainer - INFO - Epoch   9: Train Loss: 0.4296, Train Acc: 0.8280, Val Loss: 0.4803, Val Acc: 0.8150, Time: 0.18s
+2025-11-19 19:17:41,927 - baseline_trainer - INFO - Epoch  10: Train Loss: 0.4289, Train Acc: 0.8290, Val Loss: 0.4309, Val Acc: 0.8150, Time: 0.18s
+2025-11-19 19:17:41,928 - baseline_trainer - INFO - Training completed. Best validation accuracy: 0.8150
+2025-11-19 19:17:41,928 - baseline_trainer - INFO - Model saved to: ./test_baseline_results/best_baseline.pth
+2025-11-19 19:17:41,928 - baseline_trainer - INFO - Total training time: 3.11s
+2025-11-19 19:17:41,928 - baseline_trainer - INFO - Average epoch time: 0.21s
+2025-11-19 19:17:41,928 - baseline_trainer - INFO - Peak GPU memory: 0.02GB
+2025-11-19 19:17:41,928 - baseline_trainer - INFO - Loading trained model from ./test_baseline_results/best_baseline.pth
+2025-11-19 19:17:41,934 - baseline_trainer - INFO - Model loaded successfully
+2025-11-19 19:17:41,988 - __main__ - INFO - Training time: 3.11s (avg epoch: 0.21s)
+2025-11-19 19:17:41,989 - __main__ - INFO - Peak GPU memory (training): 0.02GB
+2025-11-19 19:17:41,989 - __main__ - INFO - 
+Evaluating CONFORMAL...
+2025-11-19 19:17:41,989 - SupervisedBaselineDataLoader - INFO - === Initializing SupervisedBaselineDataLoader ===
+2025-11-19 19:17:41,989 - SupervisedBaselineDataLoader - INFO - Inheriting from EnergyDPODataLoader for consistent data splits...
+2025-11-19 19:17:41,989 - data_loader - INFO - === Starting OOD Data Preparation ===
+2025-11-19 19:17:41,989 - data_loader - INFO - Dataset: drugood_lbap_general_ec50_assay | Foundation Model: minimol | Data Seed: 42
+2025-11-19 19:17:41,990 - data_loader - INFO - Loaded splits cache with 7200 total molecules from: cache/ood_dpo_cache/lbap_general_ec50_assay_seed42_splits.json
+2025-11-19 19:17:41,991 - data_loader - INFO - Loaded data splits from cache early - skipping raw data loading
+2025-11-19 19:17:42,022 - data_loader - INFO - Cache check: cached='minimol' vs current='minimol'
+2025-11-19 19:17:42,030 - data_loader - INFO - Loaded 7200 features from cache: cache/ood_dpo_cache/lbap_general_ec50_assay_minimol_features.pkl
+2025-11-19 19:17:42,032 - data_loader - INFO - All required features were found in the cache.
+2025-11-19 19:17:42,032 - data_loader - INFO - ==================================================
+2025-11-19 19:17:42,032 - data_loader - INFO - Final Dataset Summary:
+2025-11-19 19:17:42,032 - data_loader - INFO -   - train_id  :  2000 samples
+2025-11-19 19:17:42,032 - data_loader - INFO -   - train_ood :  2000 samples
+2025-11-19 19:17:42,032 - data_loader - INFO -   - val_id    :   600 samples
+2025-11-19 19:17:42,032 - data_loader - INFO -   - val_ood   :   600 samples
+2025-11-19 19:17:42,032 - data_loader - INFO -   - test_id   :  1000 samples
+2025-11-19 19:17:42,032 - data_loader - INFO -   - test_ood  :  1000 samples
+2025-11-19 19:17:42,032 - data_loader - INFO - ==================================================
+2025-11-19 19:17:42,032 - data_loader - INFO - Data preparation complete.
+2025-11-19 19:17:42,032 - SupervisedBaselineDataLoader - INFO - Loading classification labels for supervised training...
+2025-11-19 19:17:42,033 - SupervisedBaselineDataLoader - INFO - Loaded labels cache with 3600 total labels from: cache/ood_dpo_cache/lbap_general_ec50_assay_seed42_labels.json
+2025-11-19 19:17:42,033 - SupervisedBaselineDataLoader - INFO - SupervisedBaselineDataLoader initialization complete.
+2025-11-19 19:17:42,033 - SupervisedBaselineDataLoader - INFO - Available label splits: ['train_id', 'val_id', 'test_id']
+2025-11-19 19:17:42,033 - baseline_trainer - INFO - Loading model from ./test_baseline_results/best_baseline.pth
+2025-11-19 19:17:42,037 - baseline_trainer - INFO - Model loaded successfully: val_acc=0.815
+2025-11-19 19:17:42,037 - baseline_trainer - INFO - Starting CONFORMAL baseline evaluation...
+2025-11-19 19:17:42,042 - SupervisedBaselineDataLoader - INFO - Created test loaders: ID=1000 samples, OOD=1000 samples, batch_size=64
+2025-11-19 19:17:42,042 - baseline_trainer - INFO - Test data: ID=1000 samples, OOD=1000 samples
+2025-11-19 19:17:42,042 - baseline_trainer - INFO - Fitting conformal calibration on validation set...
+2025-11-19 19:17:42,043 - SupervisedBaselineDataLoader - INFO - SupervisedFeatureDataset: 600 samples, feature dim: 512
+2025-11-19 19:17:42,043 - baselinemodel - INFO - Computing conformal calibration scores...
+2025-11-19 19:17:42,136 - baselinemodel - INFO - Calibration complete: 600 samples, mean nonconformity = 0.3402
+2025-11-19 19:17:42,160 - baseline_trainer - INFO - Computing OOD scores...
+2025-11-19 19:17:42,306 - baseline_trainer - INFO - ID scores: mean=0.4939, std=0.2826
+2025-11-19 19:17:42,436 - baseline_trainer - INFO - OOD scores: mean=0.4081, std=0.2782
+2025-11-19 19:17:42,443 - baseline_trainer - INFO -   Eval time: 0.41s
+2025-11-19 19:17:42,443 - baseline_trainer - INFO -   Peak GPU memory: 0.02GB
+2025-11-19 19:17:42,444 - baseline_trainer - INFO - Results saved to: ./test_baseline_results/conformal_results.json
+2025-11-19 19:17:42,444 - baseline_trainer - INFO - 
+============================================================
+2025-11-19 19:17:42,444 - baseline_trainer - INFO - CONFORMAL BASELINE RESULTS
+2025-11-19 19:17:42,444 - baseline_trainer - INFO - ============================================================
+2025-11-19 19:17:42,444 - baseline_trainer - INFO - AUROC: 0.4125
+2025-11-19 19:17:42,445 - baseline_trainer - INFO - AUPR:  0.4383
+2025-11-19 19:17:42,445 - baseline_trainer - INFO - FPR95: 0.9790
+2025-11-19 19:17:42,445 - baseline_trainer - INFO - ============================================================
+2025-11-19 19:17:42,512 - __main__ - INFO - Results updated with training stats: ./test_baseline_results/conformal_results.json
+2025-11-19 19:17:42,512 - __main__ - INFO - 
+CONFORMAL evaluation completed successfully!
+2025-11-19 19:17:42,512 - __main__ - INFO - AUROC: 0.4125
+2025-11-19 19:17:42,512 - __main__ - INFO - Results saved in: ./test_baseline_results
+2025-11-19 19:17:42,512 - __main__ - INFO - 
+Supervised baseline evaluation completed successfully!

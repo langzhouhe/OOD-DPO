@@ -7,26 +7,28 @@ set -e
 # Experiment configuration - supports DrugOOD and GOOD datasets
 DATASETS=(
     "drugood_lbap_general_ec50_assay"
-    "drugood_lbap_general_ec50_scaffold" 
-    "drugood_lbap_general_ec50_size"
-    "drugood_lbap_general_ic50_assay"
-    "drugood_lbap_general_ic50_scaffold"
-    "drugood_lbap_general_ic50_size"
+    # "drugood_lbap_general_ec50_scaffold" 
+    # "drugood_lbap_general_ec50_size"
+    # "drugood_lbap_general_ic50_assay"
+    # "drugood_lbap_general_ic50_scaffold"
+    # "drugood_lbap_general_ic50_size"
 #     "good_zinc"
-#     "good_hiv"
+    # "good_hiv"
 #     "good_pcba"
 # 
 )
 
-SEEDS=(1 2 3 4 5 6 7 8 9 10)
+SEEDS=(1)
 DATA_SEED=42
-# METHODS=("msp" "energy")
+METHODS=("msp" "energy" "odin")
 # METHODS=("knn" "lof")
 # METHODS=("odin")
+# METHODS=("mc_dropout" "conformal")
+# METHODS=("conformal")
+# METHODS=("msp")
 
-METHODS=("msp" "energy" "odin" "mahalanobis" "knn" "lof" "dam_msp" "dam_energy")
 
-FOUNDATION_MODELS=("unimol")
+FOUNDATION_MODELS=("minimol")
 OUTPUT_BASE="./baseline_outputs"
 DATA_PATH="./data"
 
@@ -40,8 +42,8 @@ NUM_LAYERS=3
 DROPOUT=0.5
 LR=0.01
 EPOCHS=500
-BATCH_SIZE=32
-EVAL_BATCH_SIZE=64
+BATCH_SIZE=1024  # Increased from 32 -> 256 -> 1024 for better GPU utilization on 80GB A100
+EVAL_BATCH_SIZE=2048  # Increased from 64 -> 512 -> 2048 for better GPU utilization
 
 # Terminal colors
 RED='\033[0;31m'
@@ -194,12 +196,12 @@ run_single_experiment() {
     export TQDM_DISABLE=0
     export SHOW_PROGRESS=1
     
-    # 根据foundation model调整batch size
+    # 根据foundation model调整batch size - OPTIMIZED FOR 80GB A100
     local batch_size=$BATCH_SIZE
     local eval_batch_size=$EVAL_BATCH_SIZE
     if [[ "$foundation_model" == "unimol" ]]; then
-        batch_size=16  # unimol需要更小的batch size
-        eval_batch_size=32
+        batch_size=512  # Increased from 16 -> 128 -> 512 for better GPU utilization
+        eval_batch_size=1024  # Increased from 32 -> 256 -> 1024 for better GPU utilization
     fi
     
     # 移除详细的日志信息，在主循环中统一处理进度显示
@@ -225,7 +227,7 @@ run_single_experiment() {
         "--num_workers" "2"
         "--precompute_features"
         "--cache_root" "/home/ubuntu/OOD-DPO"
-        "--encoding_batch_size" "50"
+        "--encoding_batch_size" "500"  # Increased from 50 for better GPU utilization on 80GB A100
         "--data_path" "$DATA_PATH"
     )
 
@@ -251,23 +253,42 @@ run_single_experiment() {
         cmd_args+=("--data_file" "$data_file")
     fi
     
-    # 运行baseline实验 (静默运行，只记录到日志文件)
+    # 运行baseline实验 (DEBUGGING: output to console)
+    # if python baselines.py "${cmd_args[@]}"; then
     if python baselines.py "${cmd_args[@]}" > "$output_dir/experiment.log" 2>&1; then
 
-        # 读取结果但不在终端显示详细信息
+        # Read results and return metrics
         local results_file="$output_dir/${method}_results.json"
+        local training_stats_file="$output_dir/training_stats.json"
+
         if [[ -f "$results_file" ]]; then
-            local auroc=$(python -c "
+            local metrics=$(python -c "
 import json
+import os
 try:
+    # Read evaluation results
     with open('$results_file') as f:
         results = json.load(f)
-    print(f\"{results.get('auroc', 0):.4f}\")
+    auroc = results.get('auroc', 0)
+    aupr = results.get('aupr', 0)
+    fpr95 = results.get('fpr95', 1)
+    eval_time = results.get('eval_time_seconds', 0)
+    eval_gpu = results.get('peak_gpu_memory_eval_gb', 0)
+
+    # Read training stats if available
+    train_time = 0
+    train_gpu = 0
+    if os.path.exists('$training_stats_file'):
+        with open('$training_stats_file') as f:
+            train_stats = json.load(f)
+        train_time = train_stats.get('train_time_seconds', 0)
+        train_gpu = train_stats.get('peak_gpu_memory_train_gb', 0)
+
+    print(f'AUROC: {auroc:.2f}, AUPR: {aupr:.2f}, FPR95: {fpr95:.2f}, Train: {train_time:.1f}s, Eval: {eval_time:.1f}s')
 except:
-    print('0.0000')
+    print('Failed to read results')
 " 2>/dev/null)
-            # 只返回AUROC值，不在终端打印
-            echo "$auroc"
+            echo "$metrics"
             return 0
         else
             return 1
@@ -373,43 +394,74 @@ main() {
                 local dataset_aucs=()
                 local dataset_auprs=()
                 local dataset_fpr95s=()
+                local dataset_train_times=()
+                local dataset_eval_times=()
+                local dataset_epoch_times=()
+                local dataset_train_gpu=()
+                local dataset_eval_gpu=()
                 
                 for seed in "${SEEDS[@]}"; do
                     completed_experiments=$((completed_experiments + 1))
 
-                    # Simplified output, only show progress
-                    printf "[$completed_experiments/$total_experiments] %s/%s: %s (seed=%s) ... " "$method" "$foundation_model" "$dataset" "$seed"
+                    # Show progress with timing info
+                    printf "[$completed_experiments/$total_experiments] %s/%s: %s (seed=%s)\n" "$method" "$foundation_model" "$dataset" "$seed"
 
-                    if run_single_experiment "$method" "$foundation_model" "$dataset" "$seed" "$DATA_SEED"; then
-                        printf "✓\n"
+                    local result_msg=$(run_single_experiment "$method" "$foundation_model" "$dataset" "$seed" "$DATA_SEED")
+                    if [[ $? -eq 0 ]]; then
+                        echo "  $result_msg"
                         # Extract all results (AUROC, AUPR, FPR95)
                         local dataset_path_name="$dataset"
                         if is_good_dataset "$dataset"; then
                             dataset_path_name="${dataset}_${GOOD_DOMAIN}"
                         fi
+                        # Read both evaluation results and training stats files
                         local results_file="$OUTPUT_BASE/${method}/${foundation_model}/${dataset_path_name}/${seed}/${method}_results.json"
+                        local training_stats_file="$OUTPUT_BASE/${method}/${foundation_model}/${dataset_path_name}/${seed}/training_stats.json"
+
                         if [[ -f "$results_file" ]]; then
                             local metrics=$(python -c "
 import json
+import os
+
 try:
+    # Read evaluation results
     with open('$results_file') as f:
         results = json.load(f)
     auroc = results.get('auroc', 0)
     aupr = results.get('aupr', 0)
     fpr95 = results.get('fpr95', 1)
-    print(f'{auroc:.4f},{aupr:.4f},{fpr95:.4f}')
-except:
-    print('0.0000,0.0000,1.0000')
+    eval_time = results.get('eval_time_seconds', 0)
+    eval_gpu = results.get('peak_gpu_memory_eval_gb', 0)
+
+    # Read training stats if available
+    train_time = 0
+    epoch_time = 0
+    train_gpu = 0
+    if os.path.exists('$training_stats_file'):
+        with open('$training_stats_file') as f:
+            train_stats = json.load(f)
+        train_time = train_stats.get('train_time_seconds', 0)
+        epoch_time = train_stats.get('avg_epoch_time_seconds', 0)
+        train_gpu = train_stats.get('peak_gpu_memory_train_gb', 0)
+
+    print(f'{auroc:.2f},{aupr:.2f},{fpr95:.2f},{train_time:.2f},{eval_time:.2f},{epoch_time:.2f},{train_gpu:.2f},{eval_gpu:.2f}')
+except Exception as e:
+    print('0.00,0.00,1.00,0.00,0.00,0.00,0.00,0.00')
 " 2>/dev/null)
-                            IFS=',' read -r auroc aupr fpr95 <<< "$metrics"
-                            if [[ "$auroc" != "0.0000" ]]; then
+                            IFS=',' read -r auroc aupr fpr95 train_time eval_time epoch_time train_gpu eval_gpu <<< "$metrics"
+                            if [[ "$auroc" != "0.00" ]]; then
                                 dataset_aucs+=("$auroc")
                                 dataset_auprs+=("$aupr")
                                 dataset_fpr95s+=("$fpr95")
+                                dataset_train_times+=("$train_time")
+                                dataset_eval_times+=("$eval_time")
+                                dataset_epoch_times+=("$epoch_time")
+                                dataset_train_gpu+=("$train_gpu")
+                                dataset_eval_gpu+=("$eval_gpu")
                             fi
                         fi
                     else
-                        printf "✗\n"
+                        echo "  Failed"
                         failed_experiments=$((failed_experiments + 1))
                     fi
                 done
@@ -421,14 +473,24 @@ import numpy as np
 aucs = [float(x) for x in '${dataset_aucs[*]}'.split()]
 auprs = [float(x) for x in '${dataset_auprs[*]}'.split()]
 fpr95s = [float(x) for x in '${dataset_fpr95s[*]}'.split()]
+train_times = [float(x) for x in '${dataset_train_times[*]}'.split()] if '${dataset_train_times[*]}' else [0]
+eval_times = [float(x) for x in '${dataset_eval_times[*]}'.split()] if '${dataset_eval_times[*]}' else [0]
+epoch_times = [float(x) for x in '${dataset_epoch_times[*]}'.split()] if '${dataset_epoch_times[*]}' else [0]
+train_gpu = [float(x) for x in '${dataset_train_gpu[*]}'.split()] if '${dataset_train_gpu[*]}' else [0]
+eval_gpu = [float(x) for x in '${dataset_eval_gpu[*]}'.split()] if '${dataset_eval_gpu[*]}' else [0]
 
 auroc_mean, auroc_std = np.mean(aucs), (np.std(aucs, ddof=1) if len(aucs) > 1 else 0)
 aupr_mean, aupr_std = np.mean(auprs), (np.std(auprs, ddof=1) if len(auprs) > 1 else 0)
 fpr95_mean, fpr95_std = np.mean(fpr95s), (np.std(fpr95s, ddof=1) if len(fpr95s) > 1 else 0)
+train_time_mean, train_time_std = np.mean(train_times), (np.std(train_times, ddof=1) if len(train_times) > 1 else 0)
+eval_time_mean, eval_time_std = np.mean(eval_times), (np.std(eval_times, ddof=1) if len(eval_times) > 1 else 0)
+epoch_time_mean, epoch_time_std = np.mean(epoch_times), (np.std(epoch_times, ddof=1) if len(epoch_times) > 1 else 0)
+train_gpu_mean, train_gpu_std = np.mean(train_gpu), (np.std(train_gpu, ddof=1) if len(train_gpu) > 1 else 0)
+eval_gpu_mean, eval_gpu_std = np.mean(eval_gpu), (np.std(eval_gpu, ddof=1) if len(eval_gpu) > 1 else 0)
 
-print(f'{auroc_mean:.3f},{auroc_std:.3f},{aupr_mean:.3f},{aupr_std:.3f},{fpr95_mean:.3f},{fpr95_std:.3f}')
+print(f'{auroc_mean:.3f},{auroc_std:.3f},{aupr_mean:.3f},{aupr_std:.3f},{fpr95_mean:.3f},{fpr95_std:.3f},{train_time_mean:.2f},{train_time_std:.2f},{eval_time_mean:.2f},{eval_time_std:.2f},{epoch_time_mean:.2f},{epoch_time_std:.2f},{train_gpu_mean:.2f},{train_gpu_std:.2f},{eval_gpu_mean:.2f},{eval_gpu_std:.2f}')
 ")
-                    IFS=',' read -r auroc_mean auroc_std aupr_mean aupr_std fpr95_mean fpr95_std <<< "$stats"
+                    IFS=',' read -r auroc_mean auroc_std aupr_mean aupr_std fpr95_mean fpr95_std train_time_mean train_time_std eval_time_mean eval_time_std epoch_time_mean epoch_time_std train_gpu_mean train_gpu_std eval_gpu_mean eval_gpu_std <<< "$stats"
 
                     # Generate dataset record file with correct path
                     local dataset_path_name="$dataset"
@@ -437,7 +499,9 @@ print(f'{auroc_mean:.3f},{auroc_std:.3f},{aupr_mean:.3f},{aupr_std:.3f},{fpr95_m
                     fi
                     generate_dataset_metrics_file "$method" "$foundation_model" "$dataset_path_name" "$auroc_mean" "$auroc_std" "$aupr_mean" "$aupr_std" "$fpr95_mean" "$fpr95_std" "${#dataset_aucs[@]}"
 
-                    log_success "$method/$foundation_model $dataset: AUROC=$auroc_mean±$auroc_std AUPR=$aupr_mean±$aupr_std FPR95=$fpr95_mean±$fpr95_std (${#dataset_aucs[@]}/${#SEEDS[@]} seeds)"
+                    echo "Summary: AUROC=${auroc_mean}±${auroc_std}, AUPR=${aupr_mean}±${aupr_std}, FPR95=${fpr95_mean}±${fpr95_std} (success ${#dataset_aucs[@]}/${#SEEDS[@]})"
+                    echo "  Train Time: ${train_time_mean}±${train_time_std}s | Eval Time: ${eval_time_mean}±${eval_time_std}s | Avg Epoch: ${epoch_time_mean}±${epoch_time_std}s"
+                    echo "  Peak GPU (Train): ${train_gpu_mean}±${train_gpu_std}GB | Peak GPU (Eval): ${eval_gpu_mean}±${eval_gpu_std}GB"
                 fi
                 
             done
@@ -468,8 +532,60 @@ compute_summary_stats() {
 }
 
 print_final_results() {
-    log_info "Final results available in individual dataset_metrics.json files"
-    echo "Results structure: $OUTPUT_BASE/method/foundation_model/dataset/dataset_metrics.json"
+    echo ""
+    echo "=============================================================="
+    echo "FINAL RESULTS"
+    echo "=============================================================="
+
+    # Collect and print results for all methods/models/datasets
+    for method in "${METHODS[@]}"; do
+        for foundation_model in "${FOUNDATION_MODELS[@]}"; do
+            echo ""
+            echo "Method: ${method} | Model: ${foundation_model}"
+            echo "--------------------------------------------------------------"
+
+            for dataset in "${DATASETS[@]}"; do
+                local dataset_path_name="$dataset"
+                if is_good_dataset "$dataset"; then
+                    dataset_path_name="${dataset}_${GOOD_DOMAIN}"
+                fi
+
+                local metrics_file="$OUTPUT_BASE/${method}/${foundation_model}/${dataset_path_name}/dataset_metrics.json"
+
+                if [[ -f "$metrics_file" ]]; then
+                    # Parse and print metrics from the JSON file
+                    local summary=$(python -c "
+import json
+try:
+    with open('$metrics_file') as f:
+        data = json.load(f)
+    auroc_mean = data['metrics']['auroc']['mean']
+    auroc_std = data['metrics']['auroc']['std']
+    aupr_mean = data['metrics']['aupr']['mean']
+    aupr_std = data['metrics']['aupr']['std']
+    fpr95_mean = data['metrics']['fpr95']['mean']
+    fpr95_std = data['metrics']['fpr95']['std']
+    num_seeds = data['num_seeds']
+    total_seeds = data['total_seeds']
+    print(f'{auroc_mean:.3f},{auroc_std:.3f},{aupr_mean:.3f},{aupr_std:.3f},{fpr95_mean:.3f},{fpr95_std:.3f},{num_seeds},{total_seeds}')
+except:
+    print('')
+" 2>/dev/null)
+
+                    if [[ -n "$summary" ]]; then
+                        IFS=',' read -r auroc_mean auroc_std aupr_mean aupr_std fpr95_mean fpr95_std num_seeds total_seeds <<< "$summary"
+                        printf "%-40s: AUROC=%.3f±%.3f, AUPR=%.3f±%.3f, FPR95=%.3f±%.3f (%s/%s)\n" \
+                            "$dataset" "$auroc_mean" "$auroc_std" "$aupr_mean" "$aupr_std" "$fpr95_mean" "$fpr95_std" "$num_seeds" "$total_seeds"
+                    fi
+                fi
+            done
+        done
+    done
+
+    echo ""
+    echo "=============================================================="
+    log_info "Results saved in: $OUTPUT_BASE"
+    log_info "Detailed metrics available in: $OUTPUT_BASE/method/foundation_model/dataset/dataset_metrics.json"
 }
 
 # Generate ablation style summary JSON

@@ -105,7 +105,7 @@ def parse_args():
     
     # Baseline method selection
     parser.add_argument("--method", type=str, default="all",
-                       choices=['all', 'msp', 'odin', 'energy', 'mahalanobis', 'knn', 'lof', 'dam_msp', 'dam_energy'],
+                       choices=['all', 'msp', 'odin', 'energy', 'mahalanobis', 'knn', 'lof', 'mc_dropout', 'conformal', 'dam_msp', 'dam_energy'],
                        help="Which baseline method(s) to run")
     
     # ODIN-specific parameters
@@ -122,6 +122,14 @@ def parse_args():
     # LOF-specific parameters
     parser.add_argument("--lof_neighbors", type=int, default=20,
                        help="Number of neighbors for LOF method")
+
+    # MC Dropout-specific parameters
+    parser.add_argument("--mc_dropout_samples", type=int, default=20,
+                       help="Number of forward passes for MC Dropout")
+
+    parser.add_argument("--mc_dropout_metric", type=str, default='entropy',
+                       choices=['entropy', 'variance'],
+                       help="Uncertainty metric for MC Dropout")
 
     # DAM-specific parameters
     parser.add_argument("--dam_lr", type=float, default=0.1,
@@ -412,12 +420,69 @@ def main():
             
             # Train the backbone
             logger.info("\nTraining supervised classifier backbone...")
-            checkpoint_path = run_baseline_training(args)
-            
+            training_output = run_baseline_training(args)
+
+            # Extract checkpoint path and timing/memory stats
+            # Extract checkpoint path and timing/memory stats
+            if isinstance(training_output, dict):
+                checkpoint_path = training_output['checkpoint']
+                train_time = training_output.get('train_time_seconds', 0)
+                avg_epoch_time = training_output.get('avg_epoch_time_seconds', 0)
+                train_gpu = training_output.get('peak_gpu_memory_train_gb', 0)
+
+                # Save training_stats.json separately (like main.py does)
+                # This allows run_baselines.sh to read training stats consistently
+                stats_file = os.path.join(args.output_dir, 'training_stats.json')
+                with open(stats_file, 'w') as f:
+                    json.dump({
+                        'train_time_seconds': train_time,
+                        'avg_epoch_time_seconds': avg_epoch_time,
+                        'peak_gpu_memory_train_gb': train_gpu,
+                        'peak_gpu_memory_encoding_gb': training_output.get('peak_gpu_memory_encoding_gb', 0)
+                    }, f, indent=2)
+                logger.info(f"Training stats saved to: {stats_file}")
+
+                # Format training time
+                train_hours = int(train_time // 3600)
+                train_mins = int((train_time % 3600) // 60)
+                train_secs = int(train_time % 60)
+
+                logger.info(f"Training time: {train_hours:02d}:{train_mins:02d}:{train_secs:02d} ({train_time:.2f} seconds)")
+                logger.info(f"Average epoch time: {avg_epoch_time:.2f} seconds")
+                logger.info(f"Peak GPU memory (training): {train_gpu:.2f}GB")
+            else:
+                # Backward compatibility
+                checkpoint_path = training_output
+                train_time = 0
+                avg_epoch_time = 0
+                train_gpu = 0
+
+
             # Evaluate the specific method
             logger.info(f"\nEvaluating {args.method.upper()}...")
             results = run_baseline_evaluation(checkpoint_path, args.method, args)
-            
+
+            # Add timing/memory stats to results
+            results['train_time_seconds'] = train_time
+            results['avg_epoch_time_seconds'] = avg_epoch_time
+            results['peak_gpu_memory_train_gb'] = train_gpu
+
+            # Re-save results with training stats included
+            os.makedirs(args.output_dir, exist_ok=True)
+            results_file = os.path.join(args.output_dir, f'{args.method}_results.json')
+            with open(results_file, 'w') as f:
+                # Handle numpy types for JSON serialization
+                serializable_results = {}
+                for k, v in results.items():
+                    if isinstance(v, (np.integer, np.floating)):
+                        serializable_results[k] = float(v)
+                    elif isinstance(v, (int, float)):
+                        serializable_results[k] = float(v)
+                    else:
+                        serializable_results[k] = v
+                json.dump(serializable_results, f, indent=2)
+            logger.info(f"Results updated with training stats: {results_file}")
+
             logger.info(f"\n{args.method.upper()} evaluation completed successfully!")
             logger.info(f"AUROC: {results['auroc']:.4f}")
             logger.info(f"Results saved in: {args.output_dir}")

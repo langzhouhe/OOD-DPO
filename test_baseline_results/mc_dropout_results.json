@@ -1,0 +1,15 @@
+{
+  "auroc": 0.5041410000000001,
+  "aupr": 0.5250765157705233,
+  "fpr95": 0.963,
+  "id_scores_mean": 0.43399304151535034,
+  "id_scores_std": 0.08209168165922165,
+  "ood_scores_mean": 0.4347354471683502,
+  "ood_scores_std": 0.08923940360546112,
+  "separation": 0.0007424056529998779,
+  "eval_time_seconds": 0.38610339164733887,
+  "peak_gpu_memory_eval_gb": 0.017149925231933594,
+  "train_time_seconds": 2.5938034057617188,
+  "avg_epoch_time_seconds": 0.2433628559112549,
+  "peak_gpu_memory_train_gb": 0.017486572265625
+}

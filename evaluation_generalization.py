@@ -4,8 +4,7 @@ import pandas as pd
 import logging
 import os
 import argparse
-import json
-import time
+import json  
 from sklearn.metrics import roc_auc_score, precision_recall_curve, auc, roc_curve
 
 from model import load_pretrained_model
@@ -123,12 +122,9 @@ class EnergyDPOEvaluator:
         os.makedirs(output_dir, exist_ok=True)
         
         # Save metrics to JSON
-        metrics = {k: v for k, v in results.items() if isinstance(v, (int, float))}
         results_file = os.path.join(output_dir, 'ood_evaluation_results.json')
-        test_metrics_file = os.path.join(output_dir, 'test_metrics.json')  # alias for downstream scripts
-        for path in [results_file, test_metrics_file]:
-            with open(path, 'w') as f:
-                json.dump(metrics, f, indent=2)
+        with open(results_file, 'w') as f:
+            json.dump({k: v for k, v in results.items() if isinstance(v, (int, float))}, f, indent=2)
         
         # Save detailed predictions
         predictions_df = pd.DataFrame({
@@ -138,43 +134,23 @@ class EnergyDPOEvaluator:
         })
         predictions_df.to_csv(os.path.join(output_dir, 'detailed_predictions.csv'), index=False)
         
-        logger.info(f"Results saved to: {results_file} (and alias {test_metrics_file})")
+        logger.info(f"Results saved to: {results_file}")
 
     def evaluate_ood_detection_from_features(self, id_features, ood_features, output_dir=None):
         """Evaluate OOD detection using pre-computed features."""
-        # Start timing and reset GPU memory
-        eval_start_time = time.time()
-        if torch.cuda.is_available():
-            torch.cuda.reset_peak_memory_stats()
-
         if id_features.shape[0] == 0 or ood_features.shape[0] == 0:
             raise ValueError("Empty feature tensors, cannot evaluate")
-
+        
         logger.info(f"Evaluating on {id_features.shape[0]} ID and {ood_features.shape[0]} OOD samples (from features)")
-
+        
         logger.info("Computing ID energy scores from features...")
         id_scores = self.predict_batch_from_features(id_features)
-
+        
         logger.info("Computing OOD energy scores from features...")
         ood_scores = self.predict_batch_from_features(ood_features)
 
         results = self._compute_ood_metrics(id_scores, ood_scores)
-
-        # Calculate timing and memory stats
-        eval_time = time.time() - eval_start_time
-
-        # Format evaluation time
-        eval_hours = int(eval_time // 3600)
-        eval_mins = int((eval_time % 3600) // 60)
-        eval_secs = int(eval_time % 60)
-
-        peak_gpu_memory_gb = 0
-        if torch.cuda.is_available():
-            peak_gpu_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
-
-        results['eval_time_seconds'] = eval_time
-        results['peak_gpu_memory_eval_gb'] = peak_gpu_memory_gb
-
+        
         logger.info("Evaluation Results:")
         logger.info(f"  AUROC: {results['auroc']:.4f}")
         logger.info(f"  AUPR: {results['aupr']:.4f}")
@@ -182,51 +158,29 @@ class EnergyDPOEvaluator:
         logger.info(f"  Energy Separation: {results['energy_separation']:.4f}")
         logger.info(f"  ID Energy: {results['id_mean_energy']:.4f} ± {results['id_std_energy']:.4f}")
         logger.info(f"  OOD Energy: {results['ood_mean_energy']:.4f} ± {results['ood_std_energy']:.4f}")
-        logger.info(f"  Eval time: {eval_hours:02d}:{eval_mins:02d}:{eval_secs:02d} ({eval_time:.2f} seconds)")
-        logger.info(f"  Peak GPU memory (evaluation): {peak_gpu_memory_gb:.2f}GB")
-
+        
         if output_dir:
             self._save_results(results, id_scores, ood_scores, output_dir)
-
+        
         return results
 
     def evaluate_ood_detection(self, id_smiles, ood_smiles, output_dir=None):
         """Evaluate OOD detection from SMILES strings."""
-        # Start timing and reset GPU memory
-        eval_start_time = time.time()
-        if torch.cuda.is_available():
-            torch.cuda.reset_peak_memory_stats()
-
         valid_id_smiles = [s for s in validate_smiles(id_smiles) if s is not None]
         valid_ood_smiles = [s for s in validate_smiles(ood_smiles) if s is not None]
-
+        
         if len(valid_id_smiles) == 0 or len(valid_ood_smiles) == 0:
             raise ValueError("Insufficient valid samples for evaluation")
-
+        
         logger.info(f"Evaluating on {len(valid_id_smiles)} ID and {len(valid_ood_smiles)} OOD samples")
-
+        
         logger.info("Computing ID energy scores...")
         id_scores = self.predict_batch(valid_id_smiles)
         logger.info("Computing OOD energy scores...")
         ood_scores = self.predict_batch(valid_ood_smiles)
 
         results = self._compute_ood_metrics(id_scores, ood_scores)
-
-        # Calculate timing and memory stats
-        eval_time = time.time() - eval_start_time
-
-        # Format evaluation time
-        eval_hours = int(eval_time // 3600)
-        eval_mins = int((eval_time % 3600) // 60)
-        eval_secs = int(eval_time % 60)
-
-        peak_gpu_memory_gb = 0
-        if torch.cuda.is_available():
-            peak_gpu_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
-
-        results['eval_time_seconds'] = eval_time
-        results['peak_gpu_memory_eval_gb'] = peak_gpu_memory_gb
-
+        
         logger.info("Evaluation Results:")
         logger.info(f"  AUROC: {results['auroc']:.4f}")
         logger.info(f"  AUPR: {results['aupr']:.4f}")
@@ -234,12 +188,10 @@ class EnergyDPOEvaluator:
         logger.info(f"  Energy Separation: {results['energy_separation']:.4f}")
         logger.info(f"  ID Energy: {results['id_mean_energy']:.4f} ± {results['id_std_energy']:.4f}")
         logger.info(f"  OOD Energy: {results['ood_mean_energy']:.4f} ± {results['ood_std_energy']:.4f}")
-        logger.info(f"  Eval time: {eval_hours:02d}:{eval_mins:02d}:{eval_secs:02d} ({eval_time:.2f} seconds)")
-        logger.info(f"  Peak GPU memory (evaluation): {peak_gpu_memory_gb:.2f}GB")
-
+        
         if output_dir:
             self._save_results(results, id_scores, ood_scores, output_dir)
-
+        
         return results
 
 def parse_args():
@@ -253,7 +205,13 @@ def parse_args():
     parser.add_argument("--drugood_subset", type=str, default="lbap_general_ec50_scaffold")
     parser.add_argument("--data_path", type=str, default="./data")
     parser.add_argument("--data_file", type=str, help="Specific data file path")
-    
+
+    # Test dataset parameters (for cross-dataset evaluation)
+    parser.add_argument("--test_data_file", type=str, default=None,
+                        help="Separate test data file path (optional, for cross-dataset testing)")
+    parser.add_argument("--test_drugood_subset", type=str, default=None,
+                        help="Test dataset subset name (optional, used with --test_data_file)")
+
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--eval_batch_size", type=int, default=64)
     parser.add_argument("--output_dir", type=str, default="./evaluation_results")

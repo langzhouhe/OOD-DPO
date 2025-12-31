@@ -1,4 +1,5 @@
 import os
+import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -32,40 +33,20 @@ class BaselineTrainer:
     
     def __init__(self, args):
         self.args = args
-        self.device = torch.device(args.device if hasattr(args, 'device') else 
+        self.device = torch.device(args.device if hasattr(args, 'device') else
                                  'cuda' if torch.cuda.is_available() else 'cpu')
-        
-        # Initialize SUPERVISED data loader - this handles all data loading with real labels
-        logger.info("Initializing SupervisedBaselineDataLoader...")
-        self.data_loader = SupervisedBaselineDataLoader(args)
-        
+
+        # Data loader will be initialized in train() to include encoding time in training time
+        self.data_loader = None
+
         # Model will be created during training
         self.model = None
 
-        # Initialize task type flags
+        # Initialize task type flags (will be set in train() after data loader is ready)
         self.is_regression = False
         self.is_multitask = False
-
-        # Get number of classes from the loaded data
-        self.num_classes = self._determine_num_classes()
-        if hasattr(self, 'is_regression') and self.is_regression:
-            logger.info(f"Detected regression task with output dimension {self.num_classes}")
-        else:
-            logger.info(f"Detected {self.num_classes} classes in the dataset")
-        
-        # Determine input dimension based on foundation model features
-        if hasattr(self.data_loader, 'feature_cache') and self.data_loader.feature_cache:
-            # Use foundation model features
-            sample_features = next(iter(self.data_loader.feature_cache.values()))
-            if isinstance(sample_features, torch.Tensor):
-                self.input_dim = sample_features.shape[-1]
-            else:
-                self.input_dim = len(sample_features) if hasattr(sample_features, '__len__') else 512
-            logger.info(f"Using foundation model features: dim={self.input_dim}")
-        else:
-            # This should not happen with SupervisedBaselineDataLoader, but fallback
-            self.input_dim = 512
-            logger.warning("Feature cache not available - this may indicate a problem")
+        self.num_classes = None
+        self.input_dim = None
 
     def _estimate_imratio_from_loader(self, loader):
         """Estimate positive class ratio from dataloader for DAM training."""
@@ -213,12 +194,51 @@ class BaselineTrainer:
 
     def train(self):
         """Train the GNN backbone on ID data using supervised learning with real labels."""
+        # Start timing (including data loading and feature encoding)
+        train_start_time = time.time()
+        epoch_times = []
+
         logger.info("Starting supervised baseline training with real labels...")
-        
+
+        # Initialize SUPERVISED data loader - this handles all data loading with real labels
+        # Feature encoding time will be included in total training time (consistent with train.py)
+        logger.info("Initializing SupervisedBaselineDataLoader...")
+        self.data_loader = SupervisedBaselineDataLoader(self.args)
+
+        # Determine dataset properties from loaded data
+        self.num_classes = self._determine_num_classes()
+        if hasattr(self, 'is_regression') and self.is_regression:
+            logger.info(f"Detected regression task with output dimension {self.num_classes}")
+        else:
+            logger.info(f"Detected {self.num_classes} classes in the dataset")
+
+        # Determine input dimension based on foundation model features
+        if hasattr(self.data_loader, 'feature_cache') and self.data_loader.feature_cache:
+            # Use foundation model features
+            sample_features = next(iter(self.data_loader.feature_cache.values()))
+            if isinstance(sample_features, torch.Tensor):
+                self.input_dim = sample_features.shape[-1]
+            else:
+                self.input_dim = len(sample_features) if hasattr(sample_features, '__len__') else 512
+            logger.info(f"Using foundation model features: dim={self.input_dim}")
+        else:
+            # This should not happen with SupervisedBaselineDataLoader, but fallback
+            self.input_dim = 512
+            logger.warning("Feature cache not available - this may indicate a problem")
+
+        # Get encoding memory if available
+        peak_encoding_memory_gb = getattr(self.data_loader, 'peak_encoding_memory_gb', 0.0)
+        if peak_encoding_memory_gb > 0:
+            logger.info(f"Foundation model encoding peak GPU memory: {peak_encoding_memory_gb:.2f} GB")
+
+        # Reset GPU memory stats for training phase (after encoding)
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+
         # Get DataLoaders from SupervisedBaselineDataLoader
         batch_size = getattr(self.args, 'batch_size', 32)
         num_workers = min(getattr(self.args, 'num_workers', 4), 2)
-        
+
         train_loader = self.data_loader.get_training_loader(batch_size, num_workers)
         val_loader = self.data_loader.get_validation_loader(batch_size, num_workers)
         
@@ -342,8 +362,10 @@ class BaselineTrainer:
         patience_counter = 0
         
         logger.info(f"Starting training for {epochs} epochs...")
-        
+
         for epoch in range(epochs):
+            epoch_start_time = time.time()
+
             # Training phase
             self.model.train()
             train_loss = 0.0
@@ -521,12 +543,30 @@ class BaselineTrainer:
 
                     val_loss += loss.item()
             
+            epoch_time = time.time() - epoch_start_time
+            epoch_times.append(epoch_time)
+
+            # Calculate timing statistics
+            avg_epoch_time_so_far = sum(epoch_times) / len(epoch_times)
+            elapsed_time = time.time() - train_start_time
+            elapsed_hours = int(elapsed_time // 3600)
+            elapsed_mins = int((elapsed_time % 3600) // 60)
+            elapsed_secs = int(elapsed_time % 60)
+
+            # Estimate remaining time
+            epochs_remaining = epochs - (epoch + 1)
+            eta_seconds = avg_epoch_time_so_far * epochs_remaining
+            eta_hours = int(eta_seconds // 3600)
+            eta_mins = int((eta_seconds % 3600) // 60)
+            eta_secs = int(eta_seconds % 60)
+
             if use_dam:
                 # For DAM, use AUROC instead of accuracy
                 val_auroc = _eval_val_auroc(val_loader)
                 logger.info(f"Epoch {epoch+1:3d}: Train Loss: {train_loss/len(train_loader):.4f}, "
                            f"Train Acc: {train_acc:.4f}, Val Loss: {val_loss/len(val_loader):.4f}, "
                            f"Val AUROC: {val_auroc:.4f}")
+                logger.info(f"  Time: {epoch_time:.2f}s | Avg: {avg_epoch_time_so_far:.2f}s | Elapsed: {elapsed_hours:02d}:{elapsed_mins:02d}:{elapsed_secs:02d} | ETA: {eta_hours:02d}:{eta_mins:02d}:{eta_secs:02d}")
                 better_val = val_auroc > best_val_auc
                 current_val_metric = val_auroc
                 best_val_metric = best_val_auc
@@ -538,6 +578,7 @@ class BaselineTrainer:
                     logger.info(f"Epoch {epoch+1:3d}: Train Loss: {train_loss/len(train_loader):.4f}, "
                                f"Train MAE: {train_acc:.4f}, Val Loss: {val_loss/len(val_loader):.4f}, "
                                f"Val MAE: {val_acc:.4f}")
+                    logger.info(f"  Time: {epoch_time:.2f}s | Avg: {avg_epoch_time_so_far:.2f}s | Elapsed: {elapsed_hours:02d}:{elapsed_mins:02d}:{elapsed_secs:02d} | ETA: {eta_hours:02d}:{eta_mins:02d}:{eta_secs:02d}")
                     # For regression, lower MAE is better
                     if val_acc < best_val_acc or epoch == 0:
                         better_val = True
@@ -547,6 +588,7 @@ class BaselineTrainer:
                     logger.info(f"Epoch {epoch+1:3d}: Train Loss: {train_loss/len(train_loader):.4f}, "
                                f"Train Acc: {train_acc:.4f}, Val Loss: {val_loss/len(val_loader):.4f}, "
                                f"Val Acc: {val_acc:.4f}")
+                    logger.info(f"  Time: {epoch_time:.2f}s | Avg: {avg_epoch_time_so_far:.2f}s | Elapsed: {elapsed_hours:02d}:{elapsed_mins:02d}:{elapsed_secs:02d} | ETA: {eta_hours:02d}:{eta_mins:02d}:{eta_secs:02d}")
                     better_val = val_acc > best_val_acc
                 current_val_metric = val_acc
                 best_val_metric = best_val_acc
@@ -581,12 +623,31 @@ class BaselineTrainer:
                 logger.info(f"Early stopping after {epoch+1} epochs")
                 break
         
+        # Calculate timing and memory stats
+        total_train_time = time.time() - train_start_time
+        avg_epoch_time = sum(epoch_times) / len(epoch_times) if epoch_times else 0
+
+        # Format total training time
+        total_hours = int(total_train_time // 3600)
+        total_mins = int((total_train_time % 3600) // 60)
+        total_secs = int(total_train_time % 60)
+
+        # Get peak GPU memory
+        peak_gpu_memory_gb = 0
+        if torch.cuda.is_available():
+            peak_gpu_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+
         final_checkpoint = os.path.join(getattr(self.args, 'output_dir', './'), 'best_baseline.pth')
         if use_dam:
             logger.info(f"Training completed. Best validation AUROC: {best_val_auc:.4f}")
         else:
             logger.info(f"Training completed. Best validation accuracy: {best_val_acc:.4f}")
         logger.info(f"Model saved to: {final_checkpoint}")
+        logger.info(f"Total training time: {total_hours:02d}:{total_mins:02d}:{total_secs:02d} ({total_train_time:.2f} seconds)")
+        logger.info(f"Average epoch time: {avg_epoch_time:.2f} seconds")
+        logger.info(f"Peak GPU memory (training): {peak_gpu_memory_gb:.2f}GB")
+        if peak_encoding_memory_gb > 0:
+            logger.info(f"Peak GPU memory (encoding): {peak_encoding_memory_gb:.2f}GB")
 
         # Store training features for KNN and LOF methods
         # Load the best model first to ensure we use the best weights
@@ -595,7 +656,14 @@ class BaselineTrainer:
         # Store training features - this will be used by KNN/LOF methods later
         self.best_trained_model = best_model
 
-        return final_checkpoint
+        # Return checkpoint path and timing/memory stats (including encoding memory)
+        return {
+            'checkpoint': final_checkpoint,
+            'train_time_seconds': total_train_time,
+            'avg_epoch_time_seconds': avg_epoch_time,
+            'peak_gpu_memory_train_gb': peak_gpu_memory_gb,
+            'peak_gpu_memory_encoding_gb': peak_encoding_memory_gb
+        }
 
     def load_trained_model(self, checkpoint_path):
         """Load the trained model from checkpoint."""
@@ -683,6 +751,11 @@ class BaselineEvaluator:
         """Evaluate OOD detection using proper test splits."""
         logger.info(f"Starting {self.method_name.upper()} baseline evaluation...")
 
+        # Start timing and reset GPU memory (consistent with evaluation.py)
+        eval_start_time = time.time()
+        if torch.cuda.is_available():
+            torch.cuda.reset_peak_memory_stats()
+
         # Warn: MSP and Energy are equivalent (up to monotone transform) for 1-D outputs
         try:
             if self.method_name in ['msp', 'energy'] and getattr(self, 'num_classes', None) == 1:
@@ -720,7 +793,12 @@ class BaselineEvaluator:
         if score_method in ['knn', 'lof']:
             logger.info(f"Storing training features for {self.method_name.upper()} method...")
             self._store_training_features(baseline_model)
-        
+
+        # For Conformal Prediction method, fit calibration on validation data
+        if score_method == 'conformal':
+            logger.info("Fitting conformal calibration on validation set...")
+            self._fit_conformal_calibration(baseline_model)
+
         # Compute OOD scores
         logger.info("Computing OOD scores...")
         id_scores = self._get_ood_scores(baseline_model, id_test_loader, "ID")
@@ -728,11 +806,29 @@ class BaselineEvaluator:
         
         # Evaluate metrics
         results = self._compute_metrics(id_scores, ood_scores)
-        
+
+        # Calculate timing and memory stats (consistent with evaluation.py)
+        eval_time = time.time() - eval_start_time
+
+        # Format evaluation time
+        eval_hours = int(eval_time // 3600)
+        eval_mins = int((eval_time % 3600) // 60)
+        eval_secs = int(eval_time % 60)
+
+        peak_gpu_memory_gb = 0
+        if torch.cuda.is_available():
+            peak_gpu_memory_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+
+        results['eval_time_seconds'] = eval_time
+        results['peak_gpu_memory_eval_gb'] = peak_gpu_memory_gb
+
+        logger.info(f"  Eval time: {eval_hours:02d}:{eval_mins:02d}:{eval_secs:02d} ({eval_time:.2f} seconds)")
+        logger.info(f"  Peak GPU memory (evaluation): {peak_gpu_memory_gb:.2f}GB")
+
         # Save and print results
         self._save_results(results, id_scores, ood_scores)
         self._print_results(results)
-        
+
         return results
     
     def _fit_mahalanobis_statistics(self, baseline_model):
@@ -759,6 +855,17 @@ class BaselineEvaluator:
 
         # Store training features in the baseline model
         baseline_model.store_training_features(train_loader, self.device)
+
+    def _fit_conformal_calibration(self, baseline_model):
+        """Fit conformal calibration using validation data."""
+        # Get validation loader for calibration
+        batch_size = getattr(self.args, 'eval_batch_size', 64)
+        num_workers = min(getattr(self.args, 'num_workers', 4), 2)
+
+        val_loader = self.data_loader.get_validation_loader(batch_size, num_workers)
+
+        # Fit calibration scores in the baseline model
+        baseline_model.fit_conformal_calibration(val_loader, self.device)
 
     def _get_ood_scores(self, baseline_model, data_loader, data_type):
         """Get OOD scores for all samples."""
@@ -887,9 +994,9 @@ def run_all_baselines(args):
     
     # Train model once
     checkpoint_path = run_baseline_training(args)
-    
+
     # Evaluate all methods
-    methods = ['msp', 'energy', 'odin', 'mahalanobis', 'knn', 'lof']
+    methods = ['msp', 'energy', 'odin', 'mahalanobis', 'knn', 'lof', 'mc_dropout', 'conformal']
     all_results = {}
     
     for method in methods:
