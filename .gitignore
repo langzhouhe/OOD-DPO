@@ -6,6 +6,13 @@ baseline_outputs/
 ablation_results/
 outputs/
 cache/
+/logs/
+/runs/
+/repro/
+/repro_bce/
+/GOOD_official/
+/paper/
+*.pdf
 
 # Other ignored items
 __pycache__/

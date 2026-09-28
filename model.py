@@ -38,6 +38,14 @@ def _initialize_unimol():
             if os.path.exists(dict_path):
                 try:
                     _unimol_dictionary = Dictionary.load(dict_path)
+                    # Uni-Mol's own task always appends [MASK] after loading the dict
+                    # (see unimol/tasks/unimol.py). Without it the dictionary is one
+                    # token short, so embed_tokens (31,512) and the Gaussian-basis
+                    # distance encoders gbf.mul/gbf.bias (31^2,1) silently fail to load
+                    # from the pretrained checkpoint and stay randomly initialised --
+                    # i.e. the 3D geometry pathway would carry no pretrained knowledge.
+                    if "[MASK]" not in _unimol_dictionary.symbols:
+                        _unimol_dictionary.add_symbol("[MASK]", is_special=True)
                     logger.info(f"Dictionary loaded from {dict_path}")
                 except Exception:
                     _unimol_dictionary = None

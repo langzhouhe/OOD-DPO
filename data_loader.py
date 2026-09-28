@@ -256,6 +256,9 @@ class EnergyDPODataLoader:
 
         if self.enable_cache:
             self._prepare_features()
+            # Drop any SMILES the encoder could not featurize (e.g. exotic valences
+            # MiniMol/Uni-Mol reject) so downstream feature lookup never crashes.
+            self._drop_uncached_smiles()
         elif self.foundation_model == 'unimol' and getattr(self.args, 'finetune_encoder', False):
             # Finetuning Uni-Mol cannot cache encoder outputs, but we can cache expensive RDKit graph builds
             self._prepare_graph_cache()
@@ -263,6 +266,19 @@ class EnergyDPODataLoader:
         # CRITICAL FIX: Update compatibility attributes
         self._update_compatibility_attributes()
         self._print_summary()
+
+    def _drop_uncached_smiles(self):
+        """Remove SMILES that failed encoding from every split (prevents a hard
+        crash in get_dataloaders when the foundation model rejects a molecule)."""
+        if not self.feature_cache:
+            return
+        for split, smiles_list in self.final_smiles.items():
+            kept = [s for s in smiles_list if s in self.feature_cache]
+            dropped = len(smiles_list) - len(kept)
+            if dropped:
+                logger.warning(f"Split {split}: dropped {dropped} SMILES that failed encoding "
+                               f"({len(kept)} remain).")
+            self.final_smiles[split] = kept
 
     def _update_compatibility_attributes(self):
         """Update attributes to maintain compatibility with existing code."""
