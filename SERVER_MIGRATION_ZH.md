@@ -6,7 +6,7 @@
 
 | 内容 | 用途 | 放 GitHub？ |
 |---|---|---|
-| 根目录 `*.py`、`*.sh`、`data_loader.py`、`utils.py`、`model.py`、冻结协议 Markdown、`environment.yaml`、本手册 | 数据处理、编码、训练、筛选、评估 | 是（文本代码和配置） |
+| 根目录 `*.py`、`*.sh`、`data_loader.py`、`utils.py`、`model.py`、冻结协议 Markdown、`environment.yaml`、本手册、`.gitmodules` | 数据处理、编码、训练、筛选、评估；Uni-Core/Uni-Mol 以 Git 引用获取 | 是（文本代码、配置和子模块引用） |
 | DrugOOD `drugood_all.zip` 与解包的 `data/raw/lbap_general_*.json` | 六个真实数据集 | 否，新机从官方源下载并校验 |
 | GOOD HIV/PCBA/ZINC `data/GOOD*/.../processed/*.pt` | 六个真实数据集 | 否，官方 GOOD 代码下载/处理 |
 | MiniMol 1.3.5 自带 `state_dict.pth` | 冻结 512 维分子编码器 | 否，安装包获得 |
@@ -17,7 +17,7 @@
 
 ## 2. 新机目录、Python 与外部 GOOD 代码
 
-本机常用 Python `/root/miniconda3/envs/ood/bin/python`（Python 3.10）。当前实测包版本：`minimol 1.3.5`、`graphium 2.4.7`、`numpy 1.26.4`、`scikit-learn 1.7.2`、`unicore 0.0.1`、`torch 2.5.1+cpu`、`torch-geometric 2.8.0.post1`、`rdkit 2026.3.4`。仓库 `environment.yaml` 锁的是**另一套** CUDA torch 2.5.1/rdkit 2025.03.3 环境；它适合作为依赖清单，不能宣称与当前实装完全相同。MiniMol 编码在 CPU；Uni-Mol 特征预计算脚本可用 GPU。大量 frozen-feature head 实验可以在 CPU 上跑，但 20 worker 的资源开销很大。
+本机常用 Python `/root/miniconda3/envs/ood/bin/python`（Python 3.10）。当前实测包版本与安装顺序见下方；`environment.yaml` 锁的是**另一套** CUDA torch 2.5.1/rdkit 2025.03.3 环境，不能直接当当前环境安装。MiniMol 编码在 CPU；Uni-Mol 特征预计算脚本可用 GPU。大量 frozen-feature head 实验可以在 CPU 上跑，但 20 worker 的资源开销很大。
 
 新机建议保留 `/root/autodl-tmp/OOD-DPO` 和 `/root/miniconda3/envs/ood` 这两个路径，因为许多 `run_*.sh` 写死它们；纯 Python 入口可直接用所选环境的 `python`。若更换路径，先搜索替换：
 
@@ -31,15 +31,30 @@ rg -n '/root/autodl-tmp|/root/miniconda3|/home/ubuntu/projects' --glob '*.py' --
 cd /root/autodl-tmp
 git clone -b revision/oe-acquisition https://github.com/langzhouhe/OOD-DPO.git
 cd OOD-DPO
+git submodule update --init Uni-Core Uni-Mol
 git clone --branch GOODv1 https://github.com/divelab/GOOD.git GOOD_official
 git -C GOOD_official checkout b53566c9297bc65b90a7f2213fb9ffa930f5b6e5
-/root/miniconda3/envs/ood/bin/python -m pip install -e ./GOOD_official
-/root/miniconda3/envs/ood/bin/python -m pip install 'minimol==1.3.5' 'graphium==2.4.7' \
-  'numpy==1.26.4' 'scikit-learn==1.7.2' 'unicore==0.0.1' gdown
-/root/miniconda3/envs/ood/bin/python -c 'from GOOD.data.good_datasets.good_hiv import GOODHIV; from minimol import Minimol; print("imports OK")'
+python3.10 -m venv /root/miniconda3/envs/ood
+source /root/miniconda3/envs/ood/bin/activate
+python -m pip install --upgrade pip wheel setuptools
+# CPU 参考环境；有 CUDA 时按新机硬件选择同一 torch 2.5.1 的官方 wheel。
+python -m pip install 'torch==2.5.1' --index-url https://download.pytorch.org/whl/cpu
+python -m pip install 'torch-scatter==2.1.2' 'torch-sparse==0.6.18' \
+  'torch-cluster==1.6.3' -f https://data.pyg.org/whl/torch-2.5.0+cpu.html
+python -m pip install 'torch-geometric==2.8.0.post1' 'rdkit==2026.3.4' \
+  'numpy==1.26.4' 'pandas==2.3.3' 'scipy==1.10.1' 'scikit-learn==1.7.2' \
+  'minimol==1.3.5' 'graphium==2.4.7' 'datamol==0.12.5' \
+  'gdown==4.7.3' 'huggingface-hub==1.24.0' 'lmdb==2.3.0' \
+  'ml-collections==1.1.0' 'tensorboardX==2.6.5' 'wandb==0.28.1' \
+  'ogb==1.3.6' 'cilog==1.3.0' 'ruamel.yaml==0.19.1'
+python -m pip install --no-build-isolation --no-deps -e ./Uni-Core
+python -m pip install --no-deps -e ./Uni-Mol/unimol
+python -m pip install --no-deps -e ./GOOD_official
+python -c 'from GOOD.data.good_datasets.good_hiv import GOODHIV; from minimol import Minimol; from unicore.data import Dictionary; from unimol.models import UniMolModel; print("imports OK")'
+python rpo_opt_v2_screen.py --help
 ```
 
-安装 PyTorch/PyG/RDKit 时按照新服务器的 CUDA 和 Python 版本选择匹配 wheel；Graphium、MiniMol、Uni-Core/Uni-Mol 的其他依赖可参考 `environment.yaml`。当前仓库也有 `Uni-Core/`、`Uni-Mol/` 代码，但是否需要 `pip install -e` 取决于新机的 `unicore`、`unimol` import；在跑 Uni-Mol 前验证 `from unicore.data import Dictionary; from unimol.models import UniMolModel`。历史流程用了本机 clone 和包的组合，版本改变应记录到实验日志。
+`Uni-Core/`、`Uni-Mol/` 是 Git 子模块，原仓库之前缺少 `.gitmodules`，现在已补齐；它们**不是**根仓库内的普通源码。使用 `--no-deps` 安装 GOOD 是为了避开其旧 `setup.py` 中与本机不一致的严格锁定。CUDA 机器上的 PyG 扩展 wheel 必须对应所选 torch/CUDA；上方链接对应当前 CPU 实测环境，[PyG 安装说明](https://pytorch-geometric.readthedocs.io/en/latest/install/installation.html)列出了 CUDA 对应链接。当前本机 `pip check` 仍有 GOOD 训练包和 Uni-Mol 的可选依赖元数据冲突，不能将 `pip check` 全绿当作本项目复现前提；以实际入口导入、编码器加载和单格 smoke 为准。版本改变应记录到实验日志。
 
 ## 3. DrugOOD：下载、解包、划分
 

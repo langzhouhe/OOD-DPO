@@ -1,0 +1,6 @@
+[submodule "Uni-Core"]
+	path = Uni-Core
+	url = https://github.com/dptech-corp/Uni-Core.git
+[submodule "Uni-Mol"]
+	path = Uni-Mol
+	url = https://github.com/deepmodeling/Uni-Mol.git
