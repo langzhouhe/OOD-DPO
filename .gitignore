@@ -1,5 +1,11 @@
 # Data folders
-data/
+/data/*
+!/data/good_data/
+/data/good_data/*
+!/data/good_data/__init__.py
+!/data/good_data/good_datasets/
+/data/good_data/good_datasets/*
+!/data/good_data/good_datasets/*.py
 ood_dpo_cache/
 weights/
 baseline_outputs/
